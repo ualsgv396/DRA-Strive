@@ -1,0 +1,43 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: strive-mysql
+    restart: always
+    env_file: .env
+    ports:
+      - "3306:3306"
+    volumes:
+      - strive_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: strive-backend
+    restart: always
+    ports:
+      - "8080:8080"
+    env_file: .env
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/strive_db
+      SPRING_DATASOURCE_USERNAME: gymuser
+      SPRING_DATASOURCE_PASSWORD: gympass
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    container_name: strive-frontend
+    restart: always
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  strive_mysql_data:

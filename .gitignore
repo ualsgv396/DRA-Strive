@@ -1,0 +1,14 @@
+# Backend
+backend/target/
+backend/.mvn/
+*.class
+*.jar
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Secretos
+*.env
+application-prod.properties
+.env

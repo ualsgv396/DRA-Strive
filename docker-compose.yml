@@ -23,15 +23,20 @@ services:
       - "8080:8080"
     env_file: .env
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/strive_db
-      SPRING_DATASOURCE_USERNAME: gymuser
-      SPRING_DATASOURCE_PASSWORD: gympass
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+      APP_JWT_SECRET: ${APP_JWT_SECRET}
+      APP_JWT_EXPIRATION_MS: ${APP_JWT_EXPIRATION_MS}
     depends_on:
       mysql:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL}
     container_name: strive-frontend
     restart: always
     ports:

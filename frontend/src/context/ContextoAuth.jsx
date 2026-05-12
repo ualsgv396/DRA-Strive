@@ -37,6 +37,7 @@ export function ProveedorAuth({ children }) {
   const construirUsuarioDesdeAuth = (respuestaAuth) => ({
     id: respuestaAuth.userId,
     nombre: respuestaAuth.fullName,
+    nickname: respuestaAuth.nickname,
     email: respuestaAuth.email,
     rol: respuestaAuth.role
   })

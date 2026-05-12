@@ -1,21 +1,31 @@
-﻿import { useAuth } from '../context/ContextoAuth'
-import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/ContextoAuth'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import api from '../api/axios'
+import CronometroRegresivo from '../components/flash/CronometroRegresivo'
+import { useResponsive } from '../hooks/useMediaQuery'
 
 export default function Panel() {
   const { usuario, cerrarSesion } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const { isMobile } = useResponsive()
   const [rutinas, setRutinas] = useState([])
   const [cargando, setCargando] = useState(true)
 
+  // Insert optimista: la tarjeta flash aparece antes de que la API responda
+  useEffect(() => {
+    const nuevaRutina = location.state?.nuevaRutina
+    if (!nuevaRutina) return
+    setRutinas(prev =>
+      prev.some(r => r.id === nuevaRutina.id) ? prev : [nuevaRutina, ...prev]
+    )
+    window.history.replaceState({}, '')
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const cargarRutinas = async () => {
-      if (!usuario?.id) {
-        setCargando(false)
-        return
-      }
-
+      if (!usuario?.id) { setCargando(false); return }
       try {
         const respuesta = await api.get(`/routines?ownerId=${usuario.id}`)
         setRutinas(respuesta.data)
@@ -28,130 +38,219 @@ export default function Panel() {
     cargarRutinas()
   }, [usuario?.id])
 
+  const eliminarDeVista = (id) =>
+    setRutinas(prev => prev.filter(r => r.id !== id))
+
   const manejarCerrarSesion = () => {
     cerrarSesion()
     navigate('/')
   }
 
-  return (
-    <div style={estilos.contenedor}>
+  const rutinasFlash = rutinas.filter(r => r.flash)
+  const rutinasNormales = rutinas.filter(r => !r.flash)
 
-      {/* NAVBAR */}
-      <nav style={estilos.navbar}>
-        <span style={estilos.logo}>STRIVE</span>
-        <div style={estilos.navLinks}>
-          <button style={estilos.navLink} onClick={() => navigate('/ejercicios')}>
-            Ejercicios
-          </button>
-          <button style={estilos.navLink} onClick={() => navigate('/panel')}>
-            Mis rutinas
-          </button>
-        </div>
-        <div style={estilos.navDerecha}>
-          <span style={estilos.nombreUsuario}>Hola, {usuario?.nombre}</span>
-          <button style={estilos.botonSalir} onClick={manejarCerrarSesion}>
-            Salir
-          </button>
+  return (
+    <div style={s.contenedor}>
+
+      <nav style={{ ...s.navbar, padding: isMobile ? '14px 20px' : '20px 40px' }}>
+        <span style={s.logo}>STRIVE</span>
+
+        {/* Nav links solo en escritorio */}
+        {!isMobile && (
+          <div style={s.navLinks}>
+            <button style={s.navLink} onClick={() => navigate('/ejercicios')}>Ejercicios</button>
+            <button style={s.navLink} onClick={() => navigate('/panel')}>Mis rutinas</button>
+            <button style={s.navLink} onClick={() => navigate('/historial')}>Historial</button>
+          </div>
+        )}
+
+        <div style={s.navDerecha}>
+          {!isMobile && (
+            <span style={s.nombreUsuario}>Hola, {usuario?.nombre}</span>
+          )}
+          <button style={s.botonSalir} onClick={manejarCerrarSesion}>Salir</button>
         </div>
       </nav>
 
-      {/* CONTENIDO */}
-      <main style={estilos.main}>
+      <main style={{ ...s.main, padding: isMobile ? '24px 16px' : '40px' }}>
 
-        {/* Cabecera */}
-        <div style={estilos.cabecera}>
+        <div style={{
+          ...s.cabecera,
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: isMobile ? 'flex-start' : 'center',
+          marginBottom: isMobile ? '28px' : '40px',
+        }}>
           <div>
-            <h1 style={estilos.titulo}>Mis rutinas</h1>
-            <p style={estilos.subtitulo}>
+            <h1 style={{ ...s.titulo, fontSize: isMobile ? '32px' : '42px' }}>
+              Mis rutinas
+            </h1>
+            <p style={s.subtitulo}>
               {rutinas.length === 0
                 ? 'Aún no tienes rutinas. ¡Crea tu primera!'
-                : `Tienes ${rutinas.length} rutina${rutinas.length > 1 ? 's' : ''} creada${rutinas.length > 1 ? 's' : ''}`}
+                : `Tienes ${rutinas.length} rutina${rutinas.length > 1 ? 's' : ''}`}
             </p>
           </div>
-          <button style={estilos.botonNueva} onClick={() => navigate('/rutina/nueva')}>
-            + Nueva rutina
-          </button>
-        </div>
-
-        {/* Estado de carga */}
-        {cargando && (
-          <div style={estilos.estadoCentro}>
-            <p style={estilos.textoCentro}>Cargando rutinas...</p>
-          </div>
-        )}
-
-        {/* Sin rutinas */}
-        {!cargando && rutinas.length === 0 && (
-          <div style={estilos.vacio}>
-            <span style={estilos.vaciIcono}>💪</span>
-            <h3 style={estilos.vacioTitulo}>Todavía no hay nada aquí</h3>
-            <p style={estilos.vacioTexto}>Crea tu primera rutina y empieza a entrenar</p>
-            <button style={estilos.botonCrear} onClick={() => navigate('/rutina/nueva')}>
-              Crear mi primera rutina
+          <div style={{
+            ...s.acciones,
+            width: isMobile ? '100%' : 'auto',
+            flexDirection: isMobile ? 'column' : 'row',
+          }}>
+            <button
+              style={{ ...s.botonFlash, width: isMobile ? '100%' : 'auto' }}
+              onClick={() => navigate('/flash-training')}
+            >
+              ⚡ Flash Training
+            </button>
+            <button
+              style={{ ...s.botonNueva, width: isMobile ? '100%' : 'auto' }}
+              onClick={() => navigate('/rutina/nueva')}
+            >
+              + Nueva rutina
             </button>
           </div>
+        </div>
+
+        {cargando && (
+          <div style={s.estadoCentro}>
+            <p style={s.textoCentro}>Cargando rutinas...</p>
+          </div>
         )}
 
-        {/* Grid de rutinas */}
-        {!cargando && rutinas.length > 0 && (
-          <div style={estilos.grid}>
-            {rutinas.map((rutina) => (
-              <div
-                key={rutina.id}
-                style={estilos.tarjeta}
-                onClick={() => navigate(`/rutina/${rutina.id}`)}
+        {!cargando && rutinas.length === 0 && (
+          <div style={s.vacio}>
+            <span style={s.vaciIcono}>💪</span>
+            <h3 style={s.vacioTitulo}>Todavía no hay nada aquí</h3>
+            <p style={s.vacioTexto}>Crea tu primera rutina o genera un Flash Training</p>
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+              width: isMobile ? '100%' : 'auto',
+              flexDirection: isMobile ? 'column' : 'row',
+            }}>
+              <button
+                style={{ ...s.botonFlash, width: isMobile ? '100%' : 'auto' }}
+                onClick={() => navigate('/flash-training')}
               >
-                <div style={estilos.tarjetaAccento}></div>
-                <div style={estilos.tarjetaContenido}>
-                  <h3 style={estilos.tarjetaTitulo}>{rutina.name}</h3>
-                  <p style={estilos.tarjetaDescripcion}>
-                    {rutina.goal || 'Sin descripción'}
-                  </p>
-                  <div style={estilos.tarjetaPie}>
-                    <span style={estilos.tarjetaBadge}>
-                      {rutina.routineExercises?.length || 0} ejercicios
-                    </span>
-                    <span style={estilos.tarjetaFecha}>
-                      {new Date(rutina.createdAt).toLocaleDateString('es-ES')}
-                    </span>
+                ⚡ Flash Training
+              </button>
+              <button
+                style={{ ...s.botonCrear, width: isMobile ? '100%' : 'auto' }}
+                onClick={() => navigate('/rutina/nueva')}
+              >
+                Crear rutina normal
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Sección Flash Training */}
+        {!cargando && rutinasFlash.length > 0 && (
+          <div style={s.seccionFlash}>
+            <div style={s.seccionHeader}>
+              <span style={s.seccionIcono}>⚡</span>
+              <h2 style={s.seccionTitulo}>Flash Training activos</h2>
+            </div>
+            <div style={{ ...s.grid, gap: isMobile ? '16px' : '24px' }}>
+              {rutinasFlash.map(rutina => (
+                <TarjetaFlash
+                  key={rutina.id}
+                  rutina={rutina}
+                  onClick={() => navigate(`/rutina/${rutina.id}`)}
+                  onExpire={() => eliminarDeVista(rutina.id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Rutinas normales */}
+        {!cargando && rutinasNormales.length > 0 && (
+          <>
+            {rutinasFlash.length > 0 && (
+              <h2 style={s.seccionTituloNormal}>Rutinas guardadas</h2>
+            )}
+            <div style={{ ...s.grid, gap: isMobile ? '16px' : '24px' }}>
+              {rutinasNormales.map(rutina => (
+                <div
+                  key={rutina.id}
+                  style={s.tarjeta}
+                  onClick={() => navigate(`/rutina/${rutina.id}`)}
+                >
+                  <div style={s.tarjetaAccento} />
+                  <div style={s.tarjetaContenido}>
+                    <h3 style={s.tarjetaTitulo}>{rutina.name}</h3>
+                    <p style={s.tarjetaDescripcion}>{rutina.goal || 'Sin descripción'}</p>
+                    <div style={s.tarjetaPie}>
+                      <span style={s.tarjetaBadge}>
+                        {rutina.routineExercises?.length || 0} ejercicios
+                      </span>
+                      <span style={s.tarjetaFecha}>
+                        {new Date(rutina.createdAt).toLocaleDateString('es-ES')}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
 
       </main>
-
-      {/* ACCESO RÁPIDO */}
-      <div style={estilos.accesoRapido}>
-        <button style={estilos.botonRapido} onClick={() => navigate('/ejercicios')}>
-          <span style={estilos.botonRapidoIcono}>🏋️</span>
-          <span>Ver ejercicios</span>
-        </button>
-        <button style={estilos.botonRapido} onClick={() => navigate('/rutina/nueva')}>
-          <span style={estilos.botonRapidoIcono}>➕</span>
-          <span>Nueva rutina</span>
-        </button>
-      </div>
 
     </div>
   )
 }
 
-const estilos = {
+// ─── Tarjeta Flash ────────────────────────────────────────────────────────────
+function TarjetaFlash({ rutina, onClick, onExpire }) {
+  return (
+    <div style={s.tarjetaFlash} onClick={onClick}>
+      <div style={s.flashBarra} />
+      <div style={s.tarjetaContenido}>
+        <div style={s.flashCabecera}>
+          <span style={s.flashBadge}>⚡ FLASH</span>
+          <div style={s.cronometroWrap}>
+            <span style={s.cronometroLabel}>Expira en</span>
+            <CronometroRegresivo
+              expiresAt={rutina.flashExpiresAt}
+              onExpire={onExpire}
+            />
+          </div>
+        </div>
+        <h3 style={s.tarjetaTitulo}>{rutina.name}</h3>
+        <p style={s.tarjetaDescripcion}>{rutina.goal || 'Sin descripción'}</p>
+        <div style={s.tarjetaPie}>
+          <span style={{ ...s.tarjetaBadge, ...s.flashBadgeCount }}>
+            {rutina.routineExercises?.length || 0} ejercicios
+          </span>
+          <span style={s.tarjetaFecha}>
+            {new Date(rutina.createdAt).toLocaleDateString('es-ES')}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Estilos ──────────────────────────────────────────────────────────────────
+const s = {
   contenedor: {
     minHeight: '100vh',
     backgroundColor: '#0D0D0D',
-    color: '#FFFFFF'
+    color: '#FFFFFF',
+    paddingBottom: 'calc(var(--bottom-nav-h) + 24px)',
   },
   navbar: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '20px 40px',
     borderBottom: '1px solid rgba(255,255,255,0.08)',
-    backgroundColor: '#111111'
+    backgroundColor: '#111111',
+    position: 'sticky',
+    top: 0,
+    zIndex: 100,
   },
   logo: {
     fontFamily: "'Oswald', sans-serif",
@@ -159,12 +258,10 @@ const estilos = {
     fontWeight: '700',
     fontStyle: 'italic',
     color: '#E63946',
-    letterSpacing: '2px'
+    letterSpacing: '2px',
+    userSelect: 'none',
   },
-  navLinks: {
-    display: 'flex',
-    gap: '8px'
-  },
+  navLinks: { display: 'flex', gap: '8px' },
   navLink: {
     backgroundColor: 'transparent',
     border: 'none',
@@ -173,17 +270,13 @@ const estilos = {
     fontFamily: "'Inter', sans-serif",
     padding: '8px 16px',
     borderRadius: '8px',
-    cursor: 'pointer'
+    cursor: 'pointer',
   },
-  navDerecha: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px'
-  },
+  navDerecha: { display: 'flex', alignItems: 'center', gap: '16px' },
   nombreUsuario: {
     fontSize: '14px',
     color: 'rgba(255,255,255,0.6)',
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Inter', sans-serif",
   },
   botonSalir: {
     backgroundColor: 'transparent',
@@ -193,30 +286,41 @@ const estilos = {
     borderRadius: '8px',
     fontSize: '14px',
     fontFamily: "'Inter', sans-serif",
-    cursor: 'pointer'
+    cursor: 'pointer',
+    minHeight: '44px',
   },
-  main: {
-    padding: '40px',
-    maxWidth: '1200px',
-    margin: '0 auto'
-  },
+  main: { maxWidth: '1200px', margin: '0 auto' },
   cabecera: {
     display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '40px'
+    flexWrap: 'wrap',
+    gap: '16px',
   },
   titulo: {
     fontFamily: "'Oswald', sans-serif",
-    fontSize: '42px',
     fontWeight: '700',
     textTransform: 'uppercase',
-    marginBottom: '8px'
+    marginBottom: '8px',
   },
   subtitulo: {
     fontSize: '15px',
     color: 'rgba(255,255,255,0.5)',
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Inter', sans-serif",
+  },
+  acciones: { display: 'flex', gap: '12px' },
+  botonFlash: {
+    background: 'linear-gradient(90deg, #FF8C42, #FF4D4D)',
+    color: '#FFFFFF',
+    border: 'none',
+    padding: '14px 24px',
+    borderRadius: '8px',
+    fontSize: '15px',
+    fontWeight: '700',
+    fontFamily: "'Oswald', sans-serif",
+    letterSpacing: '1px',
+    textTransform: 'uppercase',
+    cursor: 'pointer',
+    boxShadow: '0 0 16px rgba(255,140,66,0.25)',
+    minHeight: '50px',
   },
   botonNueva: {
     backgroundColor: '#E63946',
@@ -229,37 +333,30 @@ const estilos = {
     fontFamily: "'Oswald', sans-serif",
     letterSpacing: '1px',
     textTransform: 'uppercase',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    minHeight: '50px',
   },
-  estadoCentro: {
-    textAlign: 'center',
-    padding: '80px 0'
-  },
-  textoCentro: {
-    color: 'rgba(255,255,255,0.4)',
-    fontFamily: "'Inter', sans-serif"
-  },
+  estadoCentro: { textAlign: 'center', padding: '80px 0' },
+  textoCentro: { color: 'rgba(255,255,255,0.4)', fontFamily: "'Inter', sans-serif" },
   vacio: {
     textAlign: 'center',
     padding: '80px 0',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '16px'
+    gap: '16px',
   },
-  vaciIcono: {
-    fontSize: '64px'
-  },
+  vaciIcono: { fontSize: '64px' },
   vacioTitulo: {
     fontFamily: "'Oswald', sans-serif",
     fontSize: '28px',
     fontWeight: '600',
-    textTransform: 'uppercase'
+    textTransform: 'uppercase',
   },
   vacioTexto: {
     fontSize: '15px',
     color: 'rgba(255,255,255,0.5)',
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Inter', sans-serif",
   },
   botonCrear: {
     backgroundColor: '#E63946',
@@ -273,49 +370,58 @@ const estilos = {
     letterSpacing: '1px',
     textTransform: 'uppercase',
     cursor: 'pointer',
-    marginTop: '8px'
+    minHeight: '50px',
+  },
+  seccionFlash: { marginBottom: '48px' },
+  seccionHeader: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' },
+  seccionIcono: { fontSize: '20px' },
+  seccionTitulo: {
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: '18px',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    color: '#FF8C42',
+  },
+  seccionTituloNormal: {
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: '18px',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    color: 'rgba(255,255,255,0.5)',
+    marginBottom: '20px',
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-    gap: '24px'
+    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
   },
+  // ── Tarjeta normal ──
   tarjeta: {
     backgroundColor: '#1A1A1A',
     borderRadius: '12px',
     overflow: 'hidden',
     cursor: 'pointer',
     display: 'flex',
-    transition: 'transform 0.2s'
+    transition: 'transform 0.2s',
   },
-  tarjetaAccento: {
-    width: '4px',
-    backgroundColor: '#E63946',
-    flexShrink: 0
-  },
-  tarjetaContenido: {
-    padding: '24px',
-    flex: 1
-  },
+  tarjetaAccento: { width: '4px', backgroundColor: '#E63946', flexShrink: 0 },
+  tarjetaContenido: { padding: '24px', flex: 1 },
   tarjetaTitulo: {
     fontFamily: "'Oswald', sans-serif",
     fontSize: '20px',
     fontWeight: '600',
     textTransform: 'uppercase',
-    marginBottom: '8px'
+    marginBottom: '8px',
   },
   tarjetaDescripcion: {
     fontSize: '14px',
     color: 'rgba(255,255,255,0.5)',
     fontFamily: "'Inter', sans-serif",
     marginBottom: '20px',
-    lineHeight: '1.5'
+    lineHeight: '1.5',
   },
-  tarjetaPie: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
+  tarjetaPie: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   tarjetaBadge: {
     backgroundColor: 'rgba(230, 57, 70, 0.15)',
     color: '#E63946',
@@ -323,36 +429,60 @@ const estilos = {
     borderRadius: '20px',
     fontSize: '12px',
     fontWeight: '600',
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Inter', sans-serif",
   },
   tarjetaFecha: {
     fontSize: '12px',
     color: 'rgba(255,255,255,0.3)',
-    fontFamily: "'Inter', sans-serif"
-  },
-  accesoRapido: {
-    position: 'fixed',
-    bottom: '24px',
-    right: '24px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px'
-  },
-  botonRapido: {
-    backgroundColor: '#1A1A1A',
-    border: '1px solid rgba(255,255,255,0.1)',
-    color: '#FFFFFF',
-    padding: '12px 20px',
-    borderRadius: '50px',
-    fontSize: '14px',
     fontFamily: "'Inter', sans-serif",
+  },
+  // ── Tarjeta Flash ──
+  tarjetaFlash: {
+    background: 'linear-gradient(135deg, #1a0a05 0%, #111 55%, #0a0a1a 100%)',
+    border: '1px solid rgba(255,140,66,0.35)',
+    borderRadius: '12px',
+    overflow: 'hidden',
     cursor: 'pointer',
     display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.4)'
+    flexDirection: 'column',
+    boxShadow: '0 0 24px rgba(255,140,66,0.1)',
+    transition: 'box-shadow 0.2s',
   },
-  botonRapidoIcono: {
-    fontSize: '18px'
-  }
+  flashBarra: {
+    height: '3px',
+    background: 'linear-gradient(90deg, #FF8C42, #FF4D4D, #FF8C42)',
+    flexShrink: 0,
+  },
+  flashCabecera: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '10px',
+  },
+  flashBadge: {
+    display: 'inline-block',
+    background: 'linear-gradient(90deg, #FF8C42, #FF4D4D)',
+    color: '#fff',
+    fontSize: '10px',
+    fontFamily: "'Oswald', sans-serif",
+    fontWeight: '700',
+    letterSpacing: '1.5px',
+    padding: '3px 10px',
+    borderRadius: '20px',
+  },
+  cronometroWrap: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: '2px',
+  },
+  cronometroLabel: {
+    fontSize: '10px',
+    color: 'rgba(255,255,255,0.35)',
+    fontFamily: "'Inter', sans-serif",
+  },
+  flashBadgeCount: {
+    backgroundColor: 'rgba(255,140,66,0.15)',
+    color: '#FF8C42',
+  },
 }

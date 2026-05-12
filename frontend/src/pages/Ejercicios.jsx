@@ -1,303 +1,496 @@
-﻿import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/ContextoAuth'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { useResponsive } from '../hooks/useMediaQuery'
 import api from '../api/axios'
+import ListaEjercicios from '../components/ejercicio/ListaEjercicios'
+import ModalDetallesEjercicio from '../components/ejercicio/ModalDetallesEjercicio'
 
-const GRUPOS_MUSCULARES = ['Todos', 'Pecho', 'Espalda', 'Hombros', 'Bíceps', 'Tríceps', 'Piernas', 'Abdomen', 'Glúteos', 'Cardio']
-const DIFICULTADES = ['Todas', 'Principiante', 'Intermedio', 'Avanzado']
+const TIPOS = ['CARDIO', 'FUERZA', 'MOVILIDAD']
 
-export default function Ejercicios() {
-  const navigate = useNavigate()
-  const { cerrarSesion, usuario } = useAuth()
-  const [ejercicios, setEjercicios] = useState([])
-  const [cargando, setCargando] = useState(true)
-  const [busqueda, setBusqueda] = useState('')
-  const [grupoSeleccionado, setGrupoSeleccionado] = useState('Todos')
-  const [dificultadSeleccionada, setDificultadSeleccionada] = useState('Todas')
-  const [ejercicioDetalle, setEjercicioDetalle] = useState(null)
+/**
+ * Imagen con lazy loading y fade-in progresivo.
+ * Se puede usar como reemplazo de <img> en TarjetaEjercicio si se desea.
+ */
+export function LazyImg({ src, alt, style, fallback }) {
+  const [cargada, setCargada] = useState(false)
+  const [error,   setError  ] = useState(false)
 
-  useEffect(() => {
-    const cargarEjercicios = async () => {
-      try {
-        const respuesta = await api.get('/ejercicios')
-        setEjercicios(respuesta.data)
-      } catch (err) {
-        console.error('Error cargando ejercicios:', err)
-      } finally {
-        setCargando(false)
-      }
-    }
-    cargarEjercicios()
-  }, [])
-
-  const ejerciciosFiltrados = ejercicios.filter((e) => {
-    const coincideBusqueda = e.nombre.toLowerCase().includes(busqueda.toLowerCase())
-    const coincideGrupo = grupoSeleccionado === 'Todos' || e.grupoMuscular === grupoSeleccionado
-    const coincideDificultad = dificultadSeleccionada === 'Todas' || e.dificultad === dificultadSeleccionada
-    return coincideBusqueda && coincideGrupo && coincideDificultad
-  })
+  if (error || !src) return fallback ?? null
 
   return (
-    <div style={estilos.contenedor}>
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      onLoad={() => setCargada(true)}
+      onError={() => setError(true)}
+      style={{ ...style, opacity: cargada ? 1 : 0, transition: 'opacity 0.3s ease', objectFit: 'cover' }}
+    />
+  )
+}
 
-      {/* NAVBAR */}
-      <nav style={estilos.navbar}>
-        <span style={estilos.logo}>STRIVE</span>
-        <div style={estilos.navLinks}>
-          <button style={estilos.navLink} onClick={() => navigate('/panel')}>
-            Mis rutinas
-          </button>
-          <button style={{ ...estilos.navLink, color: '#E63946' }}>
-            Ejercicios
-          </button>
-        </div>
-        <div style={estilos.navDerecha}>
-          <span style={estilos.nombreUsuario}>Hola, {usuario?.nombre}</span>
-          <button style={estilos.botonSalir} onClick={() => { cerrarSesion(); navigate('/') }}>
-            Salir
-          </button>
-        </div>
-      </nav>
+export default function Ejercicios() {
+  const { isMobile } = useResponsive()
 
-      <main style={estilos.main}>
+  const [ejercicios,        setEjercicios       ] = useState([])
+  const [cargando,          setCargando         ] = useState(true)
+  const [sincronizando,     setSincronizando    ] = useState(false)
+  const [busqueda,          setBusqueda         ] = useState('')
+  const [tipoSeleccionado,  setTipoSeleccionado ] = useState(null)
+  const [grupoSeleccionado, setGrupoSeleccionado] = useState(null)
+  const [ejercicioDetalle,  setEjercicioDetalle ] = useState(null)
+  const [error,             setError            ] = useState(null)
+  const [exito,             setExito            ] = useState(null)
+  // Estado exclusivo del bottom sheet de filtros
+  const [drawerAbierto, setDrawerAbierto] = useState(false)
+
+  const drawerRef = useRef(null)
+
+  useEffect(() => { cargarEjercicios() }, [])
+
+  // Cierra el drawer al rotar a landscape/desktop
+  useEffect(() => { if (!isMobile) setDrawerAbierto(false) }, [isMobile])
+
+  const cargarEjercicios = async () => {
+    try {
+      setCargando(true)
+      const r = await api.get('/exercises')
+      setEjercicios(r.data ?? [])
+      setError(null)
+    } catch {
+      setError('No se pudieron cargar los ejercicios')
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  const handleSincronizar = async () => {
+    try {
+      setSincronizando(true)
+      await api.post('/exercises/sync/external', {}, { params: { limit: 100 } })
+      await cargarEjercicios()
+      mostrarExito('Ejercicios sincronizados correctamente')
+    } catch {
+      setError('Error al sincronizar ejercicios')
+    } finally {
+      setSincronizando(false)
+    }
+  }
+
+  const handleBuscar = (e) => setBusqueda(e.target.value)
+
+  const mostrarExito = (msg) => {
+    setExito(msg)
+    setTimeout(() => setExito(null), 3500)
+  }
+
+  const gruposMusculares = useMemo(() => {
+    const set = new Set()
+    ejercicios.forEach(e => (e.muscleGroups ?? []).forEach(g => set.add(g)))
+    return [...set].sort()
+  }, [ejercicios])
+
+  const filtrosActivos =
+    (tipoSeleccionado  !== null ? 1 : 0) +
+    (grupoSeleccionado !== null ? 1 : 0)
+
+  // ── Chips de tipo (se renderizan en header desktop O en drawer móvil) ──
+  const ChipsTipo = () => (
+    <>
+      <button
+        style={{ ...s.chip, ...(tipoSeleccionado === null ? s.chipActivo : {}) }}
+        onClick={() => setTipoSeleccionado(null)}
+      >
+        Todos
+      </button>
+      {TIPOS.map(tipo => (
+        <button
+          key={tipo}
+          style={{ ...s.chip, ...(tipoSeleccionado === tipo ? s.chipActivo : {}) }}
+          onClick={() => setTipoSeleccionado(tipoSeleccionado === tipo ? null : tipo)}
+        >
+          {tipo}
+        </button>
+      ))}
+    </>
+  )
+
+  const ChipsGrupo = () => (
+    <>
+      <button
+        style={{ ...s.chipGrupo, ...(grupoSeleccionado === null ? s.chipGrupoActivo : {}) }}
+        onClick={() => setGrupoSeleccionado(null)}
+      >
+        Todos
+      </button>
+      {gruposMusculares.map(g => (
+        <button
+          key={g}
+          style={{ ...s.chipGrupo, ...(grupoSeleccionado === g ? s.chipGrupoActivo : {}) }}
+          onClick={() => setGrupoSeleccionado(grupoSeleccionado === g ? null : g)}
+        >
+          {g}
+        </button>
+      ))}
+    </>
+  )
+
+  return (
+    <div style={s.contenedor}>
+
+      <main style={{ ...s.main, paddingBottom: `calc(100px + env(safe-area-inset-bottom, 0px))` }}>
 
         {/* Cabecera */}
-        <div style={estilos.cabecera}>
+        <div style={{ ...s.cabecera, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'flex-end' }}>
           <div>
-            <h1 style={estilos.titulo}>Catálogo de ejercicios</h1>
-            <p style={estilos.subtitulo}>
-              {ejerciciosFiltrados.length} ejercicios disponibles
-            </p>
+            <h1 style={s.titulo}>Catálogo de ejercicios</h1>
+            <p style={s.subtitulo}>{ejercicios.length} ejercicios disponibles</p>
           </div>
-          <button style={estilos.botonNueva} onClick={() => navigate('/rutina/nueva')}>
-            + Nueva rutina
+          <button
+            style={{ ...s.botonSync, opacity: sincronizando ? 0.6 : 1, width: isMobile ? '100%' : 'auto' }}
+            onClick={handleSincronizar}
+            disabled={sincronizando}
+          >
+            {sincronizando ? '⟳ Sincronizando...' : '⟳ Sincronizar'}
           </button>
         </div>
 
-        {/* Filtros */}
-        <div style={estilos.filtrosContenedor}>
+        {error  && <div style={s.alertaError}>{error}</div>}
+        {exito  && <div style={s.alertaExito}>{exito}</div>}
+
+        {/* Barra de búsqueda + botón filtros (móvil) */}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
           <input
-            type="text"
+            type="search"
             placeholder="Buscar ejercicio..."
             value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            style={estilos.buscador}
+            onChange={handleBuscar}
+            style={{ ...s.buscador, flex: 1 }}
           />
-          <div style={estilos.filtrosScroll}>
-            {GRUPOS_MUSCULARES.map((grupo) => (
-              <button
-                key={grupo}
-                onClick={() => setGrupoSeleccionado(grupo)}
-                style={{
-                  ...estilos.filtroBtn,
-                  ...(grupoSeleccionado === grupo ? estilos.filtroBtnActivo : {})
-                }}
-              >
-                {grupo}
-              </button>
-            ))}
-          </div>
-          <div style={estilos.filtrosScroll}>
-            {DIFICULTADES.map((dif) => (
-              <button
-                key={dif}
-                onClick={() => setDificultadSeleccionada(dif)}
-                style={{
-                  ...estilos.filtroBtn,
-                  ...(dificultadSeleccionada === dif ? estilos.filtroBtnActivo : {})
-                }}
-              >
-                {dif}
-              </button>
-            ))}
-          </div>
+          {isMobile && (
+            <button
+              style={{ ...s.btnFiltros, ...(filtrosActivos > 0 ? s.btnFiltrosActivo : {}) }}
+              onClick={() => setDrawerAbierto(true)}
+              aria-label={`Filtros${filtrosActivos > 0 ? `, ${filtrosActivos} activos` : ''}`}
+            >
+              ⊞&thinsp;Filtros
+              {filtrosActivos > 0 && (
+                <span style={s.badgeFiltros}>{filtrosActivos}</span>
+              )}
+            </button>
+          )}
         </div>
 
-        {/* Cargando */}
-        {cargando && (
-          <div style={estilos.centro}>
-            <p style={estilos.textoCentro}>Cargando ejercicios...</p>
-          </div>
-        )}
-
-        {/* Sin resultados */}
-        {!cargando && ejerciciosFiltrados.length === 0 && (
-          <div style={estilos.centro}>
-            <span style={{ fontSize: '48px' }}>🔍</span>
-            <p style={estilos.textoCentro}>No se encontraron ejercicios</p>
-          </div>
-        )}
-
-        {/* Grid ejercicios */}
-        {!cargando && ejerciciosFiltrados.length > 0 && (
-          <div style={estilos.grid}>
-            {ejerciciosFiltrados.map((ejercicio) => (
-              <div
-                key={ejercicio.id}
-                style={estilos.tarjeta}
-                onClick={() => setEjercicioDetalle(ejercicio)}
-              >
-                <div style={estilos.tarjetaImagen}>
-                  {ejercicio.imagenUrl
-                    ? <img src={ejercicio.imagenUrl} alt={ejercicio.nombre} style={estilos.imagen} />
-                    : <span style={estilos.imagenPlaceholder}>💪</span>
-                  }
-                </div>
-                <div style={estilos.tarjetaContenido}>
-                  <div style={estilos.tarjetaHeader}>
-                    <span style={{
-                      ...estilos.badge,
-                      backgroundColor: coloresDificultad[ejercicio.dificultad]?.bg || 'rgba(255,255,255,0.1)',
-                      color: coloresDificultad[ejercicio.dificultad]?.text || '#FFFFFF'
-                    }}>
-                      {ejercicio.dificultad}
-                    </span>
-                    <span style={estilos.grupoTexto}>{ejercicio.grupoMuscular}</span>
-                  </div>
-                  <h3 style={estilos.tarjetaTitulo}>{ejercicio.nombre}</h3>
-                  <p style={estilos.tarjetaDescripcion}>
-                    {ejercicio.descripcion?.substring(0, 80)}...
-                  </p>
-                </div>
+        {/* Filtros horizontales — solo en escritorio */}
+        {!isMobile && (
+          <>
+            <div style={s.filtrosRow}>
+              <ChipsTipo />
+            </div>
+            {gruposMusculares.length > 0 && (
+              <div style={s.filtrosRow}>
+                <span style={s.filtroLabel}>Músculo:</span>
+                <ChipsGrupo />
               </div>
-            ))}
+            )}
+          </>
+        )}
+
+        {/* Chips activos compactos en móvil (debajo del buscador) */}
+        {isMobile && filtrosActivos > 0 && (
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+            {tipoSeleccionado && (
+              <button
+                style={s.chipActivo2}
+                onClick={() => setTipoSeleccionado(null)}
+              >
+                {tipoSeleccionado} ✕
+              </button>
+            )}
+            {grupoSeleccionado && (
+              <button
+                style={s.chipActivo2}
+                onClick={() => setGrupoSeleccionado(null)}
+              >
+                {grupoSeleccionado} ✕
+              </button>
+            )}
           </div>
         )}
+
+        <ListaEjercicios
+          ejercicios={ejercicios}
+          cargando={cargando}
+          onVerDetalles={setEjercicioDetalle}
+          filtro={busqueda}
+          tipoFiltro={tipoSeleccionado}
+          muscleGroupFiltro={grupoSeleccionado}
+        />
       </main>
 
-      {/* MODAL DETALLE */}
-      {ejercicioDetalle && (
-        <div style={estilos.modalOverlay} onClick={() => setEjercicioDetalle(null)}>
-          <div style={estilos.modal} onClick={(e) => e.stopPropagation()}>
-            <button style={estilos.modalCerrar} onClick={() => setEjercicioDetalle(null)}>✕</button>
-            <div style={estilos.modalImagen}>
-              {ejercicioDetalle.imagenUrl
-                ? <img src={ejercicioDetalle.imagenUrl} alt={ejercicioDetalle.nombre} style={estilos.modalImg} />
-                : <span style={{ fontSize: '80px' }}>💪</span>
-              }
+      {/* ── Bottom Sheet de filtros (móvil) ── */}
+      {drawerAbierto && (
+        <div
+          className="sheet-overlay"
+          onClick={() => setDrawerAbierto(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Filtros de ejercicios"
+        >
+          <div
+            ref={drawerRef}
+            className="sheet-panel"
+            style={s.drawerPanel}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="sheet-handle" style={s.drawerHandle} />
+
+            <div style={s.drawerCabecera}>
+              <h2 style={s.drawerTitulo}>Filtros</h2>
+              {filtrosActivos > 0 && (
+                <button
+                  style={s.btnLimpiar}
+                  onClick={() => { setTipoSeleccionado(null); setGrupoSeleccionado(null) }}
+                >
+                  Limpiar todo
+                </button>
+              )}
             </div>
-            <div style={estilos.modalContenido}>
-              <div style={estilos.modalBadges}>
-                <span style={{
-                  ...estilos.badge,
-                  backgroundColor: coloresDificultad[ejercicioDetalle.dificultad]?.bg,
-                  color: coloresDificultad[ejercicioDetalle.dificultad]?.text
-                }}>
-                  {ejercicioDetalle.dificultad}
-                </span>
-                <span style={estilos.badge}>{ejercicioDetalle.grupoMuscular}</span>
-              </div>
-              <h2 style={estilos.modalTitulo}>{ejercicioDetalle.nombre}</h2>
-              <p style={estilos.modalDescripcion}>{ejercicioDetalle.descripcion}</p>
-              <button
-                style={estilos.botonNueva}
-                onClick={() => { navigate('/rutina/nueva'); setEjercicioDetalle(null) }}
-              >
-                Añadir a rutina
-              </button>
+
+            <p style={s.drawerSeccion}>Tipo de ejercicio</p>
+            <div className="scroll-x" style={{ paddingBottom: '8px' }}>
+              <ChipsTipo />
             </div>
+
+            {gruposMusculares.length > 0 && (
+              <>
+                <p style={s.drawerSeccion}>Grupo muscular</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  <ChipsGrupo />
+                </div>
+              </>
+            )}
+
+            <button
+              style={s.btnAplicar}
+              onClick={() => setDrawerAbierto(false)}
+            >
+              {filtrosActivos > 0 ? `Aplicar ${filtrosActivos} filtro${filtrosActivos > 1 ? 's' : ''}` : 'Cerrar'}
+            </button>
           </div>
         </div>
       )}
 
+      {ejercicioDetalle && (
+        <ModalDetallesEjercicio
+          ejercicio={ejercicioDetalle}
+          onCerrar={() => setEjercicioDetalle(null)}
+        />
+      )}
     </div>
   )
 }
 
-const coloresDificultad = {
-  'Principiante': { bg: 'rgba(34, 197, 94, 0.15)', text: '#22C55E' },
-  'Intermedio': { bg: 'rgba(234, 179, 8, 0.15)', text: '#EAB308' },
-  'Avanzado': { bg: 'rgba(230, 57, 70, 0.15)', text: '#E63946' }
-}
-
-const estilos = {
-  contenedor: { minHeight: '100vh', backgroundColor: '#0D0D0D', color: '#FFFFFF' },
-  navbar: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '20px 40px', borderBottom: '1px solid rgba(255,255,255,0.08)',
-    backgroundColor: '#111111'
+// ── Estilos ───────────────────────────────────────────────────────────────────
+const s = {
+  contenedor: {
+    width: '100%',
+    minHeight: '100vh',
+    backgroundColor: '#f7f7f7',
+    display: 'flex',
+    flexDirection: 'column',
   },
-  logo: {
-    fontFamily: "'Oswald', sans-serif", fontSize: '24px', fontWeight: '700',
-    fontStyle: 'italic', color: '#E63946', letterSpacing: '2px'
+  main: {
+    flex: 1,
+    padding: '24px 16px',
+    maxWidth: '1400px',
+    margin: '0 auto',
+    width: '100%',
+    boxSizing: 'border-box',
   },
-  navLinks: { display: 'flex', gap: '8px' },
-  navLink: {
-    backgroundColor: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)',
-    fontSize: '15px', fontFamily: "'Inter', sans-serif", padding: '8px 16px',
-    borderRadius: '8px', cursor: 'pointer'
+  cabecera: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    marginBottom: '20px',
+    gap: '12px',
   },
-  navDerecha: { display: 'flex', alignItems: 'center', gap: '16px' },
-  nombreUsuario: { fontSize: '14px', color: 'rgba(255,255,255,0.6)', fontFamily: "'Inter', sans-serif" },
-  botonSalir: {
-    backgroundColor: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
-    color: 'rgba(255,255,255,0.6)', padding: '8px 16px', borderRadius: '8px',
-    fontSize: '14px', fontFamily: "'Inter', sans-serif", cursor: 'pointer'
+  titulo: { margin: '0 0 4px', fontSize: '24px', fontWeight: '800', color: '#111', fontFamily: "'Oswald', sans-serif" },
+  subtitulo: { margin: 0, fontSize: '13px', color: '#999' },
+  botonSync: {
+    padding: '10px 20px',
+    backgroundColor: '#E63946',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '700',
+    minHeight: '44px',
+    whiteSpace: 'nowrap',
   },
-  main: { padding: '40px', maxWidth: '1200px', margin: '0 auto' },
-  cabecera: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' },
-  titulo: { fontFamily: "'Oswald', sans-serif", fontSize: '42px', fontWeight: '700', textTransform: 'uppercase', marginBottom: '8px' },
-  subtitulo: { fontSize: '15px', color: 'rgba(255,255,255,0.5)', fontFamily: "'Inter', sans-serif" },
-  botonNueva: {
-    backgroundColor: '#E63946', color: '#FFFFFF', border: 'none',
-    padding: '14px 28px', borderRadius: '8px', fontSize: '15px', fontWeight: '700',
-    fontFamily: "'Oswald', sans-serif", letterSpacing: '1px', textTransform: 'uppercase', cursor: 'pointer'
+  alertaError: {
+    backgroundColor: '#fde8ea', color: '#c0392b', padding: '12px 16px',
+    borderRadius: '8px', marginBottom: '14px', fontSize: '14px',
   },
-  filtrosContenedor: { display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' },
+  alertaExito: {
+    backgroundColor: '#d4edda', color: '#155724', padding: '12px 16px',
+    borderRadius: '8px', marginBottom: '14px', fontSize: '14px', fontWeight: '600',
+  },
   buscador: {
-    backgroundColor: '#1A1A1A', border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: '8px', padding: '14px 16px', fontSize: '15px', color: '#FFFFFF',
-    fontFamily: "'Inter', sans-serif", outline: 'none', width: '100%'
+    padding: '12px 16px',
+    fontSize: '15px',
+    border: '1px solid #ddd',
+    borderRadius: '10px',
+    boxSizing: 'border-box',
+    outline: 'none',
+    minHeight: '46px',
+    appearance: 'none',
+    WebkitAppearance: 'none',
   },
-  filtrosScroll: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
-  filtroBtn: {
-    backgroundColor: '#1A1A1A', border: '1px solid rgba(255,255,255,0.1)',
-    color: 'rgba(255,255,255,0.6)', padding: '8px 16px', borderRadius: '20px',
-    fontSize: '13px', fontFamily: "'Inter', sans-serif", cursor: 'pointer'
+  // Botón "Filtros" en móvil
+  btnFiltros: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '0 16px',
+    backgroundColor: '#fff',
+    border: '1px solid #ddd',
+    borderRadius: '10px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#333',
+    minHeight: '46px',
+    minWidth: '44px',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
   },
-  filtroBtnActivo: {
-    backgroundColor: '#E63946', border: '1px solid #E63946',
-    color: '#FFFFFF', fontWeight: '600'
+  btnFiltrosActivo: {
+    borderColor: '#E63946',
+    color: '#E63946',
+    backgroundColor: 'rgba(230,57,70,0.05)',
   },
-  centro: { textAlign: 'center', padding: '80px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' },
-  textoCentro: { color: 'rgba(255,255,255,0.4)', fontFamily: "'Inter', sans-serif" },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' },
-  tarjeta: {
-    backgroundColor: '#1A1A1A', borderRadius: '12px', overflow: 'hidden',
-    cursor: 'pointer', borderLeft: '4px solid #E63946'
+  badgeFiltros: {
+    backgroundColor: '#E63946',
+    color: '#fff',
+    fontSize: '11px',
+    fontWeight: '700',
+    padding: '2px 6px',
+    borderRadius: '10px',
+    minWidth: '18px',
+    textAlign: 'center',
+    lineHeight: '16px',
   },
-  tarjetaImagen: {
-    height: '180px', backgroundColor: '#222', display: 'flex',
-    alignItems: 'center', justifyContent: 'center', overflow: 'hidden'
+  filtrosRow: {
+    display: 'flex',
+    gap: '8px',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginBottom: '10px',
   },
-  imagen: { width: '100%', height: '100%', objectFit: 'cover' },
-  imagenPlaceholder: { fontSize: '48px' },
-  tarjetaContenido: { padding: '20px' },
-  tarjetaHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' },
-  badge: { padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', fontFamily: "'Inter', sans-serif" },
-  grupoTexto: { fontSize: '12px', color: 'rgba(255,255,255,0.4)', fontFamily: "'Inter', sans-serif" },
-  tarjetaTitulo: { fontFamily: "'Oswald', sans-serif", fontSize: '18px', fontWeight: '600', textTransform: 'uppercase', marginBottom: '8px' },
-  tarjetaDescripcion: { fontSize: '13px', color: 'rgba(255,255,255,0.5)', fontFamily: "'Inter', sans-serif", lineHeight: '1.5' },
-  modalOverlay: {
-    position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px'
+  filtroLabel: { fontSize: '12px', fontWeight: '600', color: '#888' },
+  chip: {
+    padding: '7px 16px',
+    borderRadius: '20px',
+    border: '1px solid #ddd',
+    backgroundColor: '#fff',
+    color: '#555',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: '500',
+    whiteSpace: 'nowrap',
+    minHeight: '36px',
   },
-  modal: {
-    backgroundColor: '#1A1A1A', borderRadius: '16px', maxWidth: '560px',
-    width: '100%', overflow: 'hidden', position: 'relative'
+  chipActivo: {
+    backgroundColor: '#E63946',
+    color: '#fff',
+    borderColor: '#E63946',
+    fontWeight: '700',
   },
-  modalCerrar: {
-    position: 'absolute', top: '16px', right: '16px', backgroundColor: 'rgba(0,0,0,0.5)',
-    border: 'none', color: '#FFFFFF', width: '32px', height: '32px',
-    borderRadius: '50%', cursor: 'pointer', fontSize: '14px'
+  chipGrupo: {
+    padding: '6px 12px',
+    borderRadius: '20px',
+    border: '1px solid #e0e0e0',
+    backgroundColor: '#fff',
+    color: '#666',
+    cursor: 'pointer',
+    fontSize: '12px',
+    fontWeight: '500',
+    whiteSpace: 'nowrap',
+    minHeight: '34px',
   },
-  modalImagen: {
-    height: '240px', backgroundColor: '#222', display: 'flex',
-    alignItems: 'center', justifyContent: 'center', overflow: 'hidden'
+  chipGrupoActivo: {
+    backgroundColor: '#222',
+    color: '#fff',
+    borderColor: '#222',
+    fontWeight: '700',
   },
-  modalImg: { width: '100%', height: '100%', objectFit: 'cover' },
-  modalContenido: { padding: '28px' },
-  modalBadges: { display: 'flex', gap: '8px', marginBottom: '16px' },
-  modalTitulo: { fontFamily: "'Oswald', sans-serif", fontSize: '28px', fontWeight: '700', textTransform: 'uppercase', marginBottom: '12px' },
-  modalDescripcion: { fontSize: '15px', color: 'rgba(255,255,255,0.6)', fontFamily: "'Inter', sans-serif", lineHeight: '1.7', marginBottom: '24px' }
+  // Chips activos compactos que aparecen debajo del buscador en móvil
+  chipActivo2: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '5px 12px',
+    borderRadius: '20px',
+    backgroundColor: 'rgba(230,57,70,0.1)',
+    border: '1px solid rgba(230,57,70,0.4)',
+    color: '#E63946',
+    cursor: 'pointer',
+    fontSize: '12px',
+    fontWeight: '600',
+  },
+  // ── Drawer ──
+  drawerPanel: {
+    backgroundColor: '#fff',
+  },
+  drawerHandle: {
+    backgroundColor: '#bbb',
+  },
+  drawerCabecera: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '20px',
+  },
+  drawerTitulo: {
+    fontSize: '20px',
+    fontWeight: '700',
+    color: '#111',
+    margin: 0,
+    fontFamily: "'Oswald', sans-serif",
+  },
+  btnLimpiar: {
+    background: 'none',
+    border: 'none',
+    color: '#E63946',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    padding: '4px 0',
+    minHeight: '36px',
+  },
+  drawerSeccion: {
+    fontSize: '11px',
+    fontWeight: '700',
+    color: '#aaa',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    marginBottom: '12px',
+    marginTop: '20px',
+    margin: '20px 0 10px',
+  },
+  btnAplicar: {
+    width: '100%',
+    padding: '15px',
+    backgroundColor: '#E63946',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '12px',
+    fontSize: '15px',
+    fontWeight: '700',
+    marginTop: '28px',
+    cursor: 'pointer',
+    minHeight: '50px',
+    fontFamily: "'Oswald', sans-serif",
+    letterSpacing: '0.5px',
+  },
 }

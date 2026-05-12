@@ -7,6 +7,8 @@ public record RoutineExerciseRequest(
         @NotNull Long exerciseId,
         @NotNull @Min(1) Integer sets,
         @NotNull @Min(1) Integer reps,
-        @NotNull @Min(0) Integer sortOrder
+        @NotNull @Min(0) Integer sortOrder,
+        Double loadValue,
+        String loadUnit
 ) {
 }

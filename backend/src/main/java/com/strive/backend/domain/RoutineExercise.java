@@ -24,7 +24,7 @@ public class RoutineExercise {
     @JsonIgnore
     private Routine routine;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "exercise_id", nullable = false)
     private Exercise exercise;
 
@@ -33,6 +33,14 @@ public class RoutineExercise {
 
     @Column(nullable = false)
     private Integer reps;
+
+    // Carga: kg para fuerza/movilidad, segundos/minutos para cardio
+    @Column
+    private Double loadValue;
+
+    // KG | REPS | SECONDS | MINUTES
+    @Column(length = 20)
+    private String loadUnit;
 
     @Column(nullable = false)
     private Integer sortOrder;
@@ -46,6 +54,10 @@ public class RoutineExercise {
     public void setSets(Integer sets) { this.sets = sets; }
     public Integer getReps() { return reps; }
     public void setReps(Integer reps) { this.reps = reps; }
+    public Double getLoadValue() { return loadValue; }
+    public void setLoadValue(Double loadValue) { this.loadValue = loadValue; }
+    public String getLoadUnit() { return loadUnit; }
+    public void setLoadUnit(String loadUnit) { this.loadUnit = loadUnit; }
     public Integer getSortOrder() { return sortOrder; }
     public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
 }

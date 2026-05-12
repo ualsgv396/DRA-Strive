@@ -8,6 +8,7 @@ export default function Registro() {
   const { iniciarSesionDesdeRespuestaAuth } = useAuth()
   const [formulario, setFormulario] = useState({
     nombre: '',
+    nickname: '',
     email: '',
     password: '',
     confirmarPassword: ''
@@ -36,6 +37,7 @@ export default function Registro() {
     try {
       const respuesta = await api.post('/auth/register', {
         fullName: formulario.nombre,
+        nickname: formulario.nickname,
         email: formulario.email,
         password: formulario.password
       })
@@ -78,6 +80,19 @@ export default function Registro() {
                 value={formulario.nombre}
                 onChange={manejarCambio}
                 placeholder="Tu nombre"
+                required
+                style={estilos.input}
+              />
+            </div>
+
+            <div style={estilos.campoGrupo}>
+              <label style={estilos.label}>Nickname</label>
+              <input
+                type="text"
+                name="nickname"
+                value={formulario.nickname}
+                onChange={manejarCambio}
+                placeholder="ej: pepefit"
                 required
                 style={estilos.input}
               />

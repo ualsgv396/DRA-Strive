@@ -35,16 +35,28 @@ public class AuthService {
         if (userRepository.findByEmail(request.email()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already registered");
         }
+        if (userRepository.findByNicknameIgnoreCase(request.nickname().trim()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Nickname already in use");
+        }
 
         User user = new User();
         user.setFullName(request.fullName());
+        user.setNickname(request.nickname().trim().toLowerCase());
         user.setEmail(request.email());
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setRole(UserRole.USER);
         User saved = userRepository.save(user);
 
         String token = jwtService.generateToken(saved.getEmail(), saved.getRole().name());
-        return new AuthResponse(token, "Bearer", saved.getId(), saved.getEmail(), saved.getFullName(), saved.getRole().name());
+        return new AuthResponse(
+                token,
+                "Bearer",
+                saved.getId(),
+                saved.getEmail(),
+                saved.getFullName(),
+                saved.getNickname(),
+                saved.getRole().name()
+        );
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -56,6 +68,14 @@ public class AuthService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
 
         String token = jwtService.generateToken(user.getEmail(), user.getRole().name());
-        return new AuthResponse(token, "Bearer", user.getId(), user.getEmail(), user.getFullName(), user.getRole().name());
+        return new AuthResponse(
+                token,
+                "Bearer",
+                user.getId(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getNickname(),
+                user.getRole().name()
+        );
     }
 }

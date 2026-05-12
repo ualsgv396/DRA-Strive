@@ -1,13 +1,17 @@
 package com.strive.backend.dto;
 
+import com.strive.backend.domain.Difficulty;
 import com.strive.backend.domain.ExerciseType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
 
 public record CreateExerciseRequest(
         @NotBlank String title,
-        @NotBlank String imageUrl,
+        String imageUrl,
         @NotNull ExerciseType type,
-        String description
+        String description,
+        List<String> muscleGroups,
+        Difficulty difficulty
 ) {
 }

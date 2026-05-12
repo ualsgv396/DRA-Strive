@@ -2,10 +2,11 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/ContextoAuth'
 import api from '../../api/axios'
+import BotonCerrarSesion from '../../components/layout/BotonCerrarSesion'
 
 export default function PanelAdmin() {
   const navigate = useNavigate()
-  const { usuario, cerrarSesion } = useAuth()
+  const { usuario } = useAuth()
   const [stats, setStats] = useState({
     totalUsuarios: 0,
     totalEjercicios: 0,
@@ -42,12 +43,7 @@ export default function PanelAdmin() {
         </div>
         <div className="flex items-center gap-4">
           <span className="text-white/40 text-sm hidden md:block">{usuario?.nombre}</span>
-          <button
-            onClick={() => { cerrarSesion(); navigate('/') }}
-            className="border border-white/20 text-white/60 px-4 py-2 rounded-lg text-sm hover:text-white transition-colors"
-          >
-            Salir
-          </button>
+          <BotonCerrarSesion />
         </div>
       </nav>
 

@@ -4,7 +4,6 @@ import HeartAddLineIcon from 'remixicon-react/HeartAddLineIcon'
 import UserLineIcon    from 'remixicon-react/UserLineIcon'
 import TeamLineIcon    from 'remixicon-react/TeamLineIcon'
 import BookletLineIcon  from 'remixicon-react/BookletLineIcon'
-import BotonCerrarSesion from './BotonCerrarSesion'
 
 const NAV_ITEMS = [
   { label: 'INICIO',     Icon: HomeFillIcon,    ruta: '/panel'        },
@@ -69,16 +68,6 @@ export default function BottomNav() {
         )
       })}
 
-      {/* Botón cerrar sesión */}
-      <div className="flex flex-col items-center justify-center gap-1 min-h-[52px] flex-1 max-w-[72px] px-1 py-2">
-        <BotonCerrarSesion size={17} />
-        <span
-          className="font-['Inter'] text-[9px] font-semibold tracking-wide uppercase leading-none"
-          style={{ color: '#E63946' }}
-        >
-          SALIR
-        </span>
-      </div>
     </nav>
   )
 }

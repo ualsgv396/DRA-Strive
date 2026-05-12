@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import api from '../api/axios'
 import CronometroRegresivo from '../components/flash/CronometroRegresivo'
 import { useResponsive } from '../hooks/useMediaQuery'
+import BotonCerrarSesion from '../components/layout/BotonCerrarSesion'
 
 export default function Panel() {
-  const { usuario, cerrarSesion } = useAuth()
+  const { usuario } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const { isMobile } = useResponsive()
@@ -41,11 +42,6 @@ export default function Panel() {
   const eliminarDeVista = (id) =>
     setRutinas(prev => prev.filter(r => r.id !== id))
 
-  const manejarCerrarSesion = () => {
-    cerrarSesion()
-    navigate('/')
-  }
-
   const rutinasFlash = rutinas.filter(r => r.flash)
   const rutinasNormales = rutinas.filter(r => !r.flash)
 
@@ -68,7 +64,7 @@ export default function Panel() {
           {!isMobile && (
             <span style={s.nombreUsuario}>Hola, {usuario?.nombre}</span>
           )}
-          <button style={s.botonSalir} onClick={manejarCerrarSesion}>Salir</button>
+          <BotonCerrarSesion />
         </div>
       </nav>
 
@@ -277,17 +273,6 @@ const s = {
     fontSize: '14px',
     color: 'rgba(255,255,255,0.6)',
     fontFamily: "'Inter', sans-serif",
-  },
-  botonSalir: {
-    backgroundColor: 'transparent',
-    border: '1px solid rgba(255,255,255,0.2)',
-    color: 'rgba(255,255,255,0.6)',
-    padding: '8px 16px',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontFamily: "'Inter', sans-serif",
-    cursor: 'pointer',
-    minHeight: '44px',
   },
   main: { maxWidth: '1200px', margin: '0 auto' },
   cabecera: {

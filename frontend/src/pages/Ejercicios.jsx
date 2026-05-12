@@ -89,6 +89,25 @@ export default function Ejercicios() {
     return [...set].sort()
   }, [ejercicios])
 
+  // Mismo patrón que el admin: filtrado en el padre con useMemo
+  const ejerciciosFiltrados = useMemo(() => {
+    let result = ejercicios
+    if (busqueda) {
+      const q = busqueda.toLowerCase()
+      result = result.filter(e =>
+        e.title?.toLowerCase().includes(q) ||
+        e.muscleGroups?.some(g => g.toLowerCase().includes(q))
+      )
+    }
+    if (tipoSeleccionado) {
+      result = result.filter(e => e.type === tipoSeleccionado)
+    }
+    if (grupoSeleccionado) {
+      result = result.filter(e => (e.muscleGroups ?? []).includes(grupoSeleccionado))
+    }
+    return result
+  }, [ejercicios, busqueda, tipoSeleccionado, grupoSeleccionado])
+
   const filtrosActivos =
     (tipoSeleccionado  !== null ? 1 : 0) +
     (grupoSeleccionado !== null ? 1 : 0)
@@ -218,12 +237,9 @@ export default function Ejercicios() {
         )}
 
         <ListaEjercicios
-          ejercicios={ejercicios}
+          ejercicios={ejerciciosFiltrados}
           cargando={cargando}
           onVerDetalles={setEjercicioDetalle}
-          filtro={busqueda}
-          tipoFiltro={tipoSeleccionado}
-          muscleGroupFiltro={grupoSeleccionado}
         />
       </main>
 

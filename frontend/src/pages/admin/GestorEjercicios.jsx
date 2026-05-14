@@ -3,18 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import api from '../../api/axios'
 import BotonCerrarSesion from '../../components/layout/BotonCerrarSesion'
 
-// Valores del enum ExerciseType del backend
 const TIPOS = [
   { value: 'FUERZA',    label: 'Fuerza' },
   { value: 'CARDIO',    label: 'Cardio' },
   { value: 'MOVILIDAD', label: 'Movilidad' },
 ]
 
-// Valores del enum Difficulty del backend
 const DIFICULTADES = [
-  { value: 'PRINCIPIANTE', label: 'Principiante' },
-  { value: 'INTERMEDIO',   label: 'Intermedio' },
-  { value: 'AVANZADO',     label: 'Avanzado' },
+  { value: 'PRINCIPIANTE', label: 'Principiante', short: 'Princ.' },
+  { value: 'INTERMEDIO',   label: 'Intermedio',   short: 'Inter.' },
+  { value: 'AVANZADO',     label: 'Avanzado',     short: 'Avanz.' },
 ]
 
 const formularioVacio = {
@@ -22,24 +20,43 @@ const formularioVacio = {
   description:      '',
   imageUrl:         '',
   type:             'FUERZA',
-  muscleGroupsText: '', // texto libre separado por comas → se convierte en array al guardar
+  muscleGroupsText: '',
   difficulty:       'PRINCIPIANTE',
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d)) return '—'
+  const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+  return `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]}`
 }
 
 export default function GestorEjercicios() {
   const navigate = useNavigate()
-  const [ejercicios, setEjercicios]         = useState([])
-  const [cargando, setCargando]             = useState(true)
-  const [mostrarModal, setMostrarModal]     = useState(false)
-  const [formulario, setFormulario]         = useState(formularioVacio)
-  const [editandoId, setEditandoId]         = useState(null)
-  const [guardando, setGuardando]           = useState(false)
-  const [error, setError]                   = useState('')
-  const [busqueda, setBusqueda]             = useState('')
+
+  // ── Existing state (logic untouched) ──────────────────────────────────────
+  const [ejercicios, setEjercicios]               = useState([])
+  const [cargando, setCargando]                   = useState(true)
+  const [mostrarModal, setMostrarModal]           = useState(false)
+  const [formulario, setFormulario]               = useState(formularioVacio)
+  const [editandoId, setEditandoId]               = useState(null)
+  const [guardando, setGuardando]                 = useState(false)
+  const [error, setError]                         = useState('')
+  const [busqueda, setBusqueda]                   = useState('')
   const [confirmarEliminar, setConfirmarEliminar] = useState(null)
+  const [textoConfirmacion, setTextoConfirmacion] = useState('')
+
+  // ── New UI state ───────────────────────────────────────────────────────────
+  const [filtroTipo, setFiltroTipo]               = useState('')
+  const [filtroDificultad, setFiltroDificultad]   = useState('')
+  const [seleccionados, setSeleccionados]         = useState([])
+  const [paginaActual, setPaginaActual]           = useState(1)
+  const [filasPorPagina, setFilasPorPagina]       = useState(25)
 
   useEffect(() => { cargarEjercicios() }, [])
 
+  // ── Existing logic (untouched) ─────────────────────────────────────────────
   const cargarEjercicios = async () => {
     try {
       const { data } = await api.get('/exercises')
@@ -75,16 +92,12 @@ export default function GestorEjercicios() {
   const manejarCambio = (e) =>
     setFormulario(prev => ({ ...prev, [e.target.name]: e.target.value }))
 
-  // Construye el body que espera CreateExerciseRequest del backend
   const construirPayload = () => ({
     title:        formulario.title.trim(),
     imageUrl:     formulario.imageUrl.trim() || null,
     type:         formulario.type,
     description:  formulario.description.trim() || null,
-    muscleGroups: formulario.muscleGroupsText
-      .split(',')
-      .map(g => g.trim())
-      .filter(Boolean),
+    muscleGroups: formulario.muscleGroupsText.split(',').map(g => g.trim()).filter(Boolean),
     difficulty:   formulario.difficulty || null,
   })
 
@@ -108,212 +121,495 @@ export default function GestorEjercicios() {
     }
   }
 
+  const cerrarModalEliminar = () => {
+    setConfirmarEliminar(null)
+    setTextoConfirmacion('')
+  }
+
   const eliminarEjercicio = async (id) => {
     try {
       await api.delete(`/exercises/${id}`)
       setEjercicios(prev => prev.filter(e => e.id !== id))
-      setConfirmarEliminar(null)
+      cerrarModalEliminar()
     } catch (err) {
       console.error('Error eliminando ejercicio:', err)
     }
   }
 
-  // Filtra por título O por grupos musculares
+  // ── Derived data ───────────────────────────────────────────────────────────
   const ejerciciosFiltrados = ejercicios.filter(e => {
     const q = busqueda.toLowerCase()
-    return (
+    const matchBusqueda = !q ||
       e.title?.toLowerCase().includes(q) ||
       e.muscleGroups?.some(g => g.toLowerCase().includes(q))
-    )
+    const matchTipo       = !filtroTipo       || e.type       === filtroTipo
+    const matchDificultad = !filtroDificultad || e.difficulty === filtroDificultad
+    return matchBusqueda && matchTipo && matchDificultad
   })
 
-  const colorDificultad = {
-    PRINCIPIANTE: 'bg-green-500/15 text-green-400',
-    INTERMEDIO:   'bg-yellow-500/15 text-yellow-400',
-    AVANZADO:     'bg-[#E63946]/15 text-[#E63946]',
+  const totalPaginas     = Math.max(1, Math.ceil(ejerciciosFiltrados.length / filasPorPagina))
+  const inicio           = (paginaActual - 1) * filasPorPagina
+  const ejerciciosPagina = ejerciciosFiltrados.slice(inicio, inicio + filasPorPagina)
+
+  const limpiarFiltros = () => {
+    setBusqueda(''); setFiltroTipo(''); setFiltroDificultad(''); setPaginaActual(1)
   }
 
-  const colorTipo = {
-    FUERZA:    'bg-blue-500/15 text-blue-400',
-    CARDIO:    'bg-orange-500/15 text-orange-400',
-    MOVILIDAD: 'bg-teal-500/15 text-teal-400',
+  const toggleSeleccion = (id) =>
+    setSeleccionados(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
+
+  const toggleTodos = () =>
+    setSeleccionados(
+      seleccionados.length === ejerciciosPagina.length && ejerciciosPagina.length > 0
+        ? []
+        : ejerciciosPagina.map(e => e.id)
+    )
+
+  const getPaginas = () => {
+    if (totalPaginas <= 7) return Array.from({ length: totalPaginas }, (_, i) => i + 1)
+    if (paginaActual <= 4)  return [1, 2, 3, 4, 5, '...', totalPaginas]
+    if (paginaActual >= totalPaginas - 3)
+      return [1, '...', totalPaginas-4, totalPaginas-3, totalPaginas-2, totalPaginas-1, totalPaginas]
+    return [1, '...', paginaActual-1, paginaActual, paginaActual+1, '...', totalPaginas]
   }
 
+  // ── Style maps ─────────────────────────────────────────────────────────────
+  const tipoDot   = { FUERZA:'bg-[#E63946]', CARDIO:'bg-orange-400', MOVILIDAD:'bg-teal-400' }
+  const tipoBadge = {
+    FUERZA:    'border border-[#E63946]/40 text-[#E63946]',
+    CARDIO:    'border border-orange-400/40 text-orange-400',
+    MOVILIDAD: 'border border-teal-400/40 text-teal-400',
+  }
+  const difBadge = {
+    PRINCIPIANTE: 'border border-teal-400/40 text-teal-400',
+    INTERMEDIO:   'border border-yellow-400/40 text-yellow-400',
+    AVANZADO:     'border border-[#E63946]/40 text-[#E63946]',
+  }
+
+  // ── Filter button helper ───────────────────────────────────────────────────
+  const filtroBtn = (active) =>
+    `px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+      active
+        ? 'bg-[#E63946] text-white'
+        : 'bg-[#1A1A1A] text-white/50 hover:text-white border border-white/10'
+    }`
+
+  // ══════════════════════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen bg-[#0D0D0D] text-white">
+    <div className="flex h-screen bg-[#0D0D0D] text-white overflow-hidden">
 
-      {/* NAVBAR */}
-      <nav className="flex justify-between items-center px-6 md:px-10 py-5 border-b border-white/8 bg-[#111]">
-        <div className="flex items-center gap-4">
-          <span
-            className="font-['Oswald'] text-2xl font-bold italic text-[#E63946] tracking-widest cursor-pointer"
-            onClick={() => navigate('/admin')}
-          >
-            STRIVE
-          </span>
-          <span className="bg-[#E63946]/15 text-[#E63946] text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-            Admin
-          </span>
+      {/* ── SIDEBAR ────────────────────────────────────────────────────────── */}
+      <aside className="w-[220px] flex-shrink-0 bg-[#111] border-r border-white/[0.06] flex flex-col">
+
+        {/* Logo */}
+        <div className="px-5 py-5 border-b border-white/[0.06]">
+          <div className="flex items-center gap-2.5">
+            <span
+              className="font-['Oswald'] text-xl font-bold italic text-[#E63946] tracking-widest cursor-pointer"
+              onClick={() => navigate('/admin')}
+            >
+              STRIVE
+            </span>
+            <span className="bg-[#E63946]/15 text-[#E63946] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+              ADMIN
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/admin')}
-            className="text-white/40 text-sm hover:text-white transition-colors"
-          >
-            ← Panel admin
-          </button>
+
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-5 flex flex-col gap-5 overflow-y-auto">
+
+          {/* Workspace */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/25 px-2 mb-1.5">Workspace</p>
+            <SidebarBtn icon={<IconDashboard />} label="Dashboard" onClick={() => navigate('/admin')} />
+          </div>
+
+          {/* Catálogo */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/25 px-2 mb-1.5">Catálogo</p>
+            <SidebarBtn
+              icon={<IconBolt />}
+              label="Ejercicios"
+              active
+              badge={ejercicios.length}
+            />
+          </div>
+
+          {/* Personas */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/25 px-2 mb-1.5">Personas</p>
+            <SidebarBtn
+              icon={<IconUsers />}
+              label="Usuarios"
+              onClick={() => navigate('/admin/usuarios')}
+              badgeText="1.2k"
+            />
+          </div>
+
+          {/* Sistema */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/25 px-2 mb-1.5">Sistema</p>
+            <SidebarBtn icon={<IconSettings />} label="Ajustes" />
+          </div>
+        </nav>
+
+        {/* User footer */}
+        <div className="px-4 py-4 border-t border-white/[0.06] flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-[#E63946]/20 flex items-center justify-center text-[#E63946] text-xs font-bold flex-shrink-0">
+            M
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-white truncate">Marina Vidal</p>
+            <p className="text-[10px] text-white/30 truncate">admin@strive.app</p>
+          </div>
           <BotonCerrarSesion />
         </div>
-      </nav>
+      </aside>
 
-      <div className="max-w-6xl mx-auto px-6 md:px-10 py-10">
+      {/* ── MAIN ───────────────────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col overflow-hidden">
 
-        {/* Cabecera */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
-          <div>
-            <h1 className="font-['Oswald'] text-4xl font-bold uppercase mb-1">
-              Gestionar ejercicios
-            </h1>
-            <p className="text-white/40 text-sm">{ejercicios.length} ejercicios en el catálogo</p>
+        {/* Top bar */}
+        <header className="flex items-center justify-between px-8 py-4 border-b border-white/[0.06] bg-[#111] flex-shrink-0">
+          <div className="flex items-center gap-2 text-sm text-white/40">
+            <span className="hover:text-white cursor-pointer transition-colors" onClick={() => navigate('/admin')}>Admin</span>
+            <ChevronRight />
+            <span>Catálogo</span>
+            <ChevronRight />
+            <span className="text-white font-medium">Ejercicios</span>
           </div>
-          <button
-            onClick={abrirCrear}
-            className="bg-[#E63946] text-white px-6 py-3 rounded-lg font-['Oswald'] font-bold uppercase tracking-wider hover:bg-[#C1121F] transition-colors"
-          >
-            + Nuevo ejercicio
-          </button>
-        </div>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <IconSearch cls="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+              <input
+                type="text"
+                placeholder="Buscar en todo el admin..."
+                className="bg-[#1A1A1A] border border-white/10 rounded-lg pl-9 pr-10 py-2 text-sm text-white/60 w-60 outline-none focus:border-white/20 transition-colors placeholder-white/25"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-white/20 font-mono">⌘K</span>
+            </div>
+            <button className="relative p-2 rounded-lg hover:bg-white/5 transition-colors text-white/40 hover:text-white">
+              <IconBell />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#E63946] rounded-full" />
+            </button>
+          </div>
+        </header>
 
-        {/* Buscador */}
-        <input
-          type="text"
-          placeholder="Buscar por nombre o grupo muscular..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="w-full bg-[#1A1A1A] border border-white/10 rounded-lg px-4 py-3 text-white mb-6 outline-none focus:border-[#E63946] transition-colors"
-        />
+        {/* Scrollable content */}
+        <main className="flex-1 overflow-y-auto p-8">
 
-        {/* Lista */}
-        {cargando ? (
-          <div className="text-center py-20 text-white/30">Cargando ejercicios...</div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {ejerciciosFiltrados.map((ej) => (
-              <div
-                key={ej.id}
-                className="flex items-center gap-4 bg-[#1A1A1A] rounded-xl p-4 border border-white/5 hover:border-white/10 transition-colors"
+          {/* Page header */}
+          <div className="flex items-start justify-between mb-8">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E63946] mb-1">Catálogo</p>
+              <h1 className="font-['Oswald'] text-5xl font-bold uppercase leading-none mb-2">Ejercicios</h1>
+              <p className="text-white/40 text-sm">
+                {ejercicios.length} ejercicios ·{' '}
+                <span className="text-[#E63946]">+12 este mes</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-3 mt-2">
+              <button className="bg-[#1A1A1A] border border-white/10 text-white/70 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-white/5 transition-colors">
+                Importar CSV
+              </button>
+              <button
+                onClick={abrirCrear}
+                className="flex items-center gap-2 text-white px-5 py-2.5 rounded-lg font-['Oswald'] font-bold uppercase tracking-wider text-sm hover:opacity-90 transition-opacity"
+                style={{ background: 'linear-gradient(135deg,#E63946,#C1121F)' }}
               >
-                {/* Imagen */}
-                <div className="w-14 h-14 bg-[#222] rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  {ej.imageUrl
-                    ? <img src={ej.imageUrl} alt={ej.title} className="w-full h-full object-cover" />
-                    : <span className="text-2xl">💪</span>
-                  }
+                <span className="text-xl leading-none font-light">+</span>
+                Nuevo ejercicio
+              </button>
+            </div>
+          </div>
+
+          {/* Filter row */}
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[180px] max-w-xs">
+              <IconSearch cls="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+              <input
+                type="text"
+                placeholder="Buscar nombre o músculo..."
+                value={busqueda}
+                onChange={e => { setBusqueda(e.target.value); setPaginaActual(1) }}
+                className="w-full bg-[#1A1A1A] border border-white/10 rounded-lg pl-9 pr-4 py-2.5 text-sm text-white outline-none focus:border-[#E63946]/50 transition-colors placeholder-white/30"
+              />
+            </div>
+
+            {/* Tipo */}
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/30 mr-1">Tipo</span>
+              <button onClick={() => { setFiltroTipo('');     setPaginaActual(1) }} className={filtroBtn(!filtroTipo)}>Todos</button>
+              {TIPOS.map(t => (
+                <button key={t.value} onClick={() => { setFiltroTipo(t.value); setPaginaActual(1) }} className={filtroBtn(filtroTipo === t.value)}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Dificultad */}
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/30 mr-1">Dificultad</span>
+              <button onClick={() => { setFiltroDificultad('');     setPaginaActual(1) }} className={filtroBtn(!filtroDificultad)}>Todas</button>
+              {DIFICULTADES.map(d => (
+                <button key={d.value} onClick={() => { setFiltroDificultad(d.value); setPaginaActual(1) }} className={filtroBtn(filtroDificultad === d.value)}>
+                  {d.short}
+                </button>
+              ))}
+            </div>
+
+            <button onClick={limpiarFiltros} className="px-4 py-2.5 rounded-lg text-xs font-semibold bg-[#1A1A1A] border border-white/10 text-white/60 hover:text-white transition-colors">
+              Limpiar
+            </button>
+          </div>
+
+          {/* Bulk actions banner */}
+          {seleccionados.length > 0 && (
+            <div className="flex items-center gap-4 bg-[#E63946]/[0.08] border border-[#E63946]/20 rounded-xl px-5 py-3 mb-4">
+              <span className="w-6 h-6 bg-[#E63946] rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0">
+                {seleccionados.length}
+              </span>
+              <span className="text-sm text-white/60">
+                {seleccionados.length} seleccionado{seleccionados.length !== 1 ? 's' : ''} · aplica acciones masivas
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                <button className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1A1A1A] border border-white/15 text-white/70 hover:text-white transition-colors">
+                  Cambiar tipo
+                </button>
+                <button className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1A1A1A] border border-white/15 text-white/70 hover:text-white transition-colors">
+                  Exportar
+                </button>
+                <button className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#E63946]/15 border border-[#E63946]/30 text-[#E63946] hover:bg-[#E63946]/25 transition-colors">
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Table card */}
+          <div className="bg-[#111] rounded-2xl border border-white/[0.06] overflow-hidden">
+            {cargando ? (
+              <div className="text-center py-20 text-white/30">Cargando ejercicios...</div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-white/[0.06]">
+                        <th className="w-10 px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={seleccionados.length === ejerciciosPagina.length && ejerciciosPagina.length > 0}
+                            onChange={toggleTodos}
+                            className="w-4 h-4 rounded accent-[#E63946] cursor-pointer"
+                          />
+                        </th>
+                        {['IMG','TÍTULO','MÚSCULOS','TIPO','DIFICULTAD','ACCIONES'].map((h, i) => (
+                          <th key={h} className={`px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-white/30 ${i === 5 ? 'text-right' : 'text-left'}`}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ejerciciosPagina.map(ej => (
+                        <tr
+                          key={ej.id}
+                          className={`border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors ${seleccionados.includes(ej.id) ? 'bg-[#E63946]/[0.04]' : ''}`}
+                        >
+                          {/* Checkbox */}
+                          <td className="px-4 py-4">
+                            <input
+                              type="checkbox"
+                              checked={seleccionados.includes(ej.id)}
+                              onChange={() => toggleSeleccion(ej.id)}
+                              className="w-4 h-4 rounded accent-[#E63946] cursor-pointer"
+                            />
+                          </td>
+
+                          {/* IMG */}
+                          <td className="px-4 py-4">
+                            <div className="w-12 h-12 bg-[#1A1A1A] rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                              {ej.imageUrl
+                                ? <img src={ej.imageUrl} alt={ej.title} className="w-full h-full object-cover" />
+                                : <span className="text-white/20 text-xs font-mono font-bold">//</span>
+                              }
+                            </div>
+                          </td>
+
+                          {/* Título */}
+                          <td className="px-4 py-4 min-w-[180px]">
+                            <p className="font-['Oswald'] font-semibold uppercase text-sm tracking-wide leading-tight">
+                              {ej.title}
+                            </p>
+                            <p className="text-white/30 text-xs mt-0.5">
+                              actualizado · {formatDate(ej.updatedAt)}
+                            </p>
+                          </td>
+
+                          {/* Músculos */}
+                          <td className="px-4 py-4">
+                            <div className="flex flex-wrap gap-1.5">
+                              {ej.muscleGroups?.slice(0, 3).map((m, i) => (
+                                <span key={i} className="text-[11px] border border-white/15 text-white/55 px-2.5 py-0.5 rounded-full">
+                                  {m}
+                                </span>
+                              ))}
+                              {(ej.muscleGroups?.length ?? 0) === 0 && (
+                                <span className="text-white/20 text-xs">—</span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Tipo */}
+                          <td className="px-4 py-4">
+                            {ej.type && (
+                              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${tipoBadge[ej.type] ?? 'border border-white/20 text-white/50'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${tipoDot[ej.type] ?? 'bg-white/30'}`} />
+                                {TIPOS.find(t => t.value === ej.type)?.label ?? ej.type}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Dificultad */}
+                          <td className="px-4 py-4">
+                            {ej.difficulty && (
+                              <span className={`inline-block text-xs font-semibold px-3 py-1 rounded-full ${difBadge[ej.difficulty] ?? 'border border-white/20 text-white/50'}`}>
+                                {DIFICULTADES.find(d => d.value === ej.difficulty)?.label ?? ej.difficulty}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Acciones */}
+                          <td className="px-4 py-4">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => abrirEditar(ej)}
+                                title="Editar"
+                                className="p-2 rounded-lg text-white/30 hover:text-white hover:bg-white/5 transition-colors"
+                              >
+                                <IconEdit />
+                              </button>
+                              <button
+                                onClick={() => setConfirmarEliminar(ej)}
+                                title="Eliminar"
+                                className="p-2 rounded-lg text-white/30 hover:text-[#E63946] hover:bg-[#E63946]/10 transition-colors"
+                              >
+                                <IconTrash />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="font-['Oswald'] font-semibold uppercase truncate">{ej.title}</p>
-                  <p className="text-white/40 text-xs truncate">
-                    {ej.muscleGroups?.join(', ') || '—'}
+                {ejerciciosPagina.length === 0 && (
+                  <div className="text-center py-20 text-white/30">
+                    <p className="text-3xl mb-3">🔍</p>
+                    <p>No se encontraron ejercicios</p>
+                  </div>
+                )}
+
+                {/* Pagination footer */}
+                <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.06]">
+                  <p className="text-xs text-white/40">
+                    Mostrando{' '}
+                    <strong className="text-white font-semibold">
+                      {ejerciciosFiltrados.length === 0 ? 0 : inicio + 1}–{Math.min(inicio + filasPorPagina, ejerciciosFiltrados.length)}
+                    </strong>
+                    {' '}de{' '}
+                    <strong className="text-white font-semibold">{ejerciciosFiltrados.length}</strong>
                   </p>
-                </div>
 
-                {/* Badges */}
-                <div className="hidden sm:flex gap-2 flex-shrink-0">
-                  {ej.type && (
-                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${colorTipo[ej.type] ?? 'bg-white/10 text-white/50'}`}>
-                      {TIPOS.find(t => t.value === ej.type)?.label ?? ej.type}
-                    </span>
-                  )}
-                  {ej.difficulty && (
-                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${colorDificultad[ej.difficulty] ?? 'bg-white/10 text-white/50'}`}>
-                      {DIFICULTADES.find(d => d.value === ej.difficulty)?.label ?? ej.difficulty}
-                    </span>
-                  )}
-                </div>
+                  <div className="flex items-center gap-4">
+                    {/* Rows selector */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-white/30 mr-1">Filas</span>
+                      {[10, 25, 50].map(n => (
+                        <button
+                          key={n}
+                          onClick={() => { setFilasPorPagina(n); setPaginaActual(1) }}
+                          className={`w-8 h-7 rounded text-xs font-semibold transition-colors ${filasPorPagina === n ? 'bg-white/10 text-white' : 'text-white/35 hover:text-white'}`}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
 
-                {/* Acciones */}
-                <div className="flex gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => abrirEditar(ej)}
-                    className="border border-white/20 text-white/60 px-3 py-2 rounded-lg text-sm hover:text-white hover:border-white/40 transition-colors"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => setConfirmarEliminar(ej)}
-                    className="border border-[#E63946]/30 text-[#E63946]/70 px-3 py-2 rounded-lg text-sm hover:bg-[#E63946]/10 transition-colors"
-                  >
-                    Eliminar
-                  </button>
+                    {/* Page numbers */}
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        onClick={() => setPaginaActual(p => Math.max(1, p - 1))}
+                        disabled={paginaActual === 1}
+                        className="w-7 h-7 rounded flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                        </svg>
+                      </button>
+                      {getPaginas().map((p, i) => (
+                        <button
+                          key={i}
+                          onClick={() => typeof p === 'number' && setPaginaActual(p)}
+                          disabled={p === '...'}
+                          className={`w-7 h-7 rounded text-xs font-semibold transition-colors ${
+                            p === paginaActual
+                              ? 'bg-[#E63946] text-white'
+                              : p === '...'
+                              ? 'text-white/30 cursor-default'
+                              : 'text-white/40 hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => setPaginaActual(p => Math.min(totalPaginas, p + 1))}
+                        disabled={paginaActual === totalPaginas}
+                        className="w-7 h-7 rounded flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
-
-            {ejerciciosFiltrados.length === 0 && !cargando && (
-              <div className="text-center py-20 text-white/30">
-                <p className="text-4xl mb-4">🔍</p>
-                <p>No se encontraron ejercicios</p>
-              </div>
+              </>
             )}
           </div>
-        )}
+        </main>
       </div>
 
-      {/* MODAL CREAR / EDITAR */}
+      {/* ── MODAL CREAR / EDITAR ────────────────────────────────────────────── */}
       {mostrarModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-[#1A1A1A] rounded-2xl p-8 w-full max-w-lg border border-white/10 max-h-[90vh] overflow-y-auto">
             <h3 className="font-['Oswald'] text-2xl font-bold uppercase mb-6">
               {editandoId ? 'Editar ejercicio' : 'Nuevo ejercicio'}
             </h3>
-
             <div className="flex flex-col gap-5">
-
-              {/* Nombre */}
               <Campo label="Nombre *">
-                <input
-                  name="title"
-                  value={formulario.title}
-                  onChange={manejarCambio}
-                  placeholder="Nombre del ejercicio"
-                  className={inputCls}
-                />
+                <input name="title" value={formulario.title} onChange={manejarCambio}
+                  placeholder="Nombre del ejercicio" className={inputCls} />
               </Campo>
-
-              {/* Descripción */}
               <Campo label="Descripción">
-                <textarea
-                  name="description"
-                  value={formulario.description}
-                  onChange={manejarCambio}
-                  placeholder="Descripción del ejercicio..."
-                  rows={3}
-                  className={`${inputCls} resize-none`}
-                />
+                <textarea name="description" value={formulario.description} onChange={manejarCambio}
+                  placeholder="Descripción del ejercicio..." rows={3} className={`${inputCls} resize-none`} />
               </Campo>
-
-              {/* URL imagen */}
               <Campo label="URL de imagen">
-                <input
-                  name="imageUrl"
-                  value={formulario.imageUrl}
-                  onChange={manejarCambio}
-                  placeholder="https://..."
-                  className={inputCls}
-                />
+                <input name="imageUrl" value={formulario.imageUrl} onChange={manejarCambio}
+                  placeholder="https://..." className={inputCls} />
                 {formulario.imageUrl && (
-                  <img
-                    src={formulario.imageUrl}
-                    alt="Vista previa"
+                  <img src={formulario.imageUrl} alt="Vista previa"
                     className="mt-2 w-full h-32 object-cover rounded-lg border border-white/10"
-                    onError={(e) => { e.currentTarget.style.display = 'none' }}
-                  />
+                    onError={e => { e.currentTarget.style.display = 'none' }} />
                 )}
               </Campo>
-
-              {/* Tipo + Dificultad */}
               <div className="grid grid-cols-2 gap-4">
                 <Campo label="Tipo">
                   <select name="type" value={formulario.type} onChange={manejarCambio} className={inputCls}>
@@ -326,36 +622,20 @@ export default function GestorEjercicios() {
                   </select>
                 </Campo>
               </div>
-
-              {/* Grupos musculares */}
               <Campo label="Grupos musculares (separados por coma)">
-                <input
-                  name="muscleGroupsText"
-                  value={formulario.muscleGroupsText}
-                  onChange={manejarCambio}
-                  placeholder="Pecho, Tríceps, Hombros"
-                  className={inputCls}
-                />
+                <input name="muscleGroupsText" value={formulario.muscleGroupsText} onChange={manejarCambio}
+                  placeholder="Pecho, Tríceps, Hombros" className={inputCls} />
               </Campo>
-
               {error && (
-                <div className="bg-[#E63946]/15 border border-[#E63946]/40 rounded-lg px-4 py-3 text-[#E63946] text-sm">
-                  {error}
-                </div>
+                <div className="bg-[#E63946]/15 border border-[#E63946]/40 rounded-lg px-4 py-3 text-[#E63946] text-sm">{error}</div>
               )}
-
               <div className="flex gap-3 mt-2">
-                <button
-                  onClick={() => setMostrarModal(false)}
-                  className="flex-1 border border-white/20 text-white/60 py-3 rounded-lg text-sm hover:text-white transition-colors"
-                >
+                <button onClick={() => setMostrarModal(false)}
+                  className="flex-1 border border-white/20 text-white/60 py-3 rounded-lg text-sm hover:text-white transition-colors">
                   Cancelar
                 </button>
-                <button
-                  onClick={guardarEjercicio}
-                  disabled={guardando}
-                  className="flex-1 bg-[#E63946] text-white py-3 rounded-lg font-bold text-sm hover:bg-[#C1121F] transition-colors disabled:opacity-70"
-                >
+                <button onClick={guardarEjercicio} disabled={guardando}
+                  className="flex-1 bg-[#E63946] text-white py-3 rounded-lg font-bold text-sm hover:bg-[#C1121F] transition-colors disabled:opacity-70">
                   {guardando ? 'Guardando...' : editandoId ? 'Guardar cambios' : 'Crear ejercicio'}
                 </button>
               </div>
@@ -364,43 +644,202 @@ export default function GestorEjercicios() {
         </div>
       )}
 
-      {/* MODAL CONFIRMAR ELIMINAR */}
+      {/* ── MODAL CONFIRMAR ELIMINAR ────────────────────────────────────────── */}
       {confirmarEliminar && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-6">
-          <div className="bg-[#1A1A1A] rounded-2xl p-8 max-w-sm w-full border border-white/10">
-            <h3 className="font-['Oswald'] text-2xl font-bold uppercase mb-3">¿Eliminar ejercicio?</h3>
-            <p className="text-white/50 text-sm mb-8 leading-relaxed">
-              Se eliminará <span className="text-white font-semibold">{confirmarEliminar.title}</span> del catálogo permanentemente.
-            </p>
-            <div className="flex gap-3">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+          <div
+            className="bg-[#161616] rounded-2xl w-full max-w-lg border border-[#E63946]/25 overflow-hidden"
+            style={{ boxShadow: '0 0 40px rgba(230,57,70,0.12), 0 25px 60px rgba(0,0,0,0.6)' }}
+          >
+            {/* Body */}
+            <div className="p-8">
+              {/* Trash icon */}
+              <div
+                className="w-14 h-14 rounded-2xl bg-[#E63946]/15 border border-[#E63946]/30 flex items-center justify-center mb-6"
+                style={{ boxShadow: '0 0 20px rgba(230,57,70,0.2)' }}
+              >
+                <svg className="w-6 h-6 text-[#E63946]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                </svg>
+              </div>
+
+              {/* Title */}
+              <h3 className="font-['Oswald'] text-3xl font-bold uppercase mb-3 tracking-wide">
+                ¿Eliminar ejercicio?
+              </h3>
+
+              {/* Description */}
+              <p className="text-white/60 text-sm leading-relaxed mb-5">
+                Se eliminará{' '}
+                <span className="text-white font-bold">{confirmarEliminar.title}</span>
+                {' '}del catálogo. Esta acción no se puede deshacer.
+              </p>
+
+              {/* Consequences */}
+              <ul className="flex flex-col gap-2.5 mb-7">
+                {[
+                  'Se conservan las sesiones de entrenamiento ya registradas',
+                  'Las rutinas que lo usan quedarán sin ese ejercicio',
+                  'No se puede recuperar desde papelera',
+                ].map((item, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-sm text-white/45">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#E63946] mt-1.5 flex-shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+
+              {/* Confirmation input */}
+              <div>
+                <p className="text-[11px] font-bold tracking-[0.18em] text-white/30 uppercase mb-3">
+                  Escribe{' '}
+                  <span className="text-[#E63946]">ELIMINAR</span>
+                  {' '}para confirmar
+                </p>
+                <input
+                  type="text"
+                  value={textoConfirmacion}
+                  onChange={e => setTextoConfirmacion(e.target.value.toUpperCase())}
+                  placeholder="ELIMINAR"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="w-full bg-[#0D0D0D] border border-white/12 rounded-xl px-5 py-4 text-white font-mono text-sm tracking-[0.25em] outline-none focus:border-[#E63946]/40 transition-colors placeholder-white/15"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center gap-3 px-8 py-5 border-t border-white/[0.06] bg-[#111]">
               <button
-                onClick={() => setConfirmarEliminar(null)}
-                className="flex-1 border border-white/20 text-white/60 py-3 rounded-lg text-sm hover:text-white transition-colors"
+                onClick={cerrarModalEliminar}
+                className="flex-1 bg-[#1E1E1E] border border-white/10 text-white/65 py-3.5 rounded-xl text-sm font-semibold hover:text-white hover:border-white/20 transition-colors"
               >
                 Cancelar
               </button>
               <button
                 onClick={() => eliminarEjercicio(confirmarEliminar.id)}
-                className="flex-1 bg-[#E63946] text-white py-3 rounded-lg text-sm font-bold hover:bg-[#C1121F] transition-colors"
+                disabled={textoConfirmacion !== 'ELIMINAR'}
+                className="flex-1 py-3.5 rounded-xl font-['Oswald'] font-bold uppercase tracking-wider text-sm transition-all disabled:cursor-not-allowed"
+                style={{
+                  background: textoConfirmacion === 'ELIMINAR' ? 'linear-gradient(135deg,#C1121F,#9B0D17)' : '#3a1518',
+                  color: textoConfirmacion === 'ELIMINAR' ? '#fff' : 'rgba(255,255,255,0.3)',
+                }}
               >
-                Eliminar
+                Eliminar ejercicio
               </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   )
 }
 
-// Helper: wrapper de campo con etiqueta
+// ── Sub-components ────────────────────────────────────────────────────────────
+
 function Campo({ label, children }) {
   return (
     <div className="flex flex-col gap-2">
       <label className="text-xs font-semibold text-white/60 uppercase tracking-wider">{label}</label>
       {children}
     </div>
+  )
+}
+
+function SidebarBtn({ icon, label, active, onClick, badge, badgeText }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+        active
+          ? 'bg-[#E63946]/10 text-[#E63946] font-medium'
+          : 'text-white/45 hover:text-white hover:bg-white/5'
+      }`}
+    >
+      <span className="w-4 h-4 flex-shrink-0">{icon}</span>
+      {label}
+      {badge !== undefined && (
+        <span className="ml-auto bg-[#E63946] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+          {badge}
+        </span>
+      )}
+      {badgeText && (
+        <span className="ml-auto text-white/30 text-[10px] font-bold">{badgeText}</span>
+      )}
+    </button>
+  )
+}
+
+function ChevronRight() {
+  return (
+    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+    </svg>
+  )
+}
+
+function IconSearch({ cls = 'w-4 h-4' }) {
+  return (
+    <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+    </svg>
+  )
+}
+
+function IconBell() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+    </svg>
+  )
+}
+
+function IconDashboard() {
+  return (
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
+    </svg>
+  )
+}
+
+function IconBolt() {
+  return (
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+    </svg>
+  )
+}
+
+function IconUsers() {
+  return (
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+    </svg>
+  )
+}
+
+function IconSettings() {
+  return (
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+    </svg>
+  )
+}
+
+function IconEdit() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+    </svg>
+  )
+}
+
+function IconTrash() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+    </svg>
   )
 }
 

@@ -4,6 +4,7 @@ import com.strive.backend.domain.User;
 import com.strive.backend.domain.UserRole;
 import com.strive.backend.repository.UserRepository;
 import com.strive.backend.security.JwtService;
+import java.time.LocalDateTime;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -66,6 +67,13 @@ public class AuthService {
 
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
+
+        if (user.isSuspended()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cuenta suspendida");
+        }
+
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
 
         String token = jwtService.generateToken(user.getEmail(), user.getRole().name());
         return new AuthResponse(

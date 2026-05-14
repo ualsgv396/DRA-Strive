@@ -14,6 +14,7 @@ import Amigos from './pages/Amigos'
 import Perfil from './pages/Perfil'
 import PanelAdmin from './pages/admin/PanelAdmin'
 import GestorEjercicios from './pages/admin/GestorEjercicios'
+import GestionUsuarios from './pages/admin/GestionUsuarios'
 import RegistroEntreno from './pages/RegistroEntreno'
 import HistorialEntrenos from './pages/HistorialEntrenos'
 
@@ -38,6 +39,7 @@ function RutasApp() {
         <Route path="/perfil" element={<Perfil />} />
         <Route path="/admin" element={<PanelAdmin />} />
         <Route path="/admin/ejercicios" element={<GestorEjercicios />} />
+        <Route path="/admin/usuarios" element={<GestionUsuarios />} />
         <Route path="/entrenamiento/:sessionId" element={<RegistroEntreno />} />
         <Route path="/historial" element={<HistorialEntrenos />} />
         <Route path="*" element={<Navigate to="/" replace />} />

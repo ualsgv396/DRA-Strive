@@ -18,4 +18,23 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
     @Modifying
     @Query("UPDATE Routine r SET r.flashVisible = false WHERE r.isFlash = true AND r.flashVisible = true AND r.flashExpiresAt < :now")
     int deactivateExpiredFlash(@Param("now") LocalDateTime now);
+
+    long countByCreatedAtAfter(LocalDateTime desde);
+
+    @Query("SELECT COUNT(r) FROM Routine r WHERE r.isFlash = true AND r.flashVisible = true")
+    long countFlashActivos();
+
+    @Query("SELECT COUNT(r) FROM Routine r WHERE r.isFlash = true AND r.flashVisible = true AND r.flashExpiresAt <= :limite")
+    long countFlashCaducanAntes(@Param("limite") LocalDateTime limite);
+
+    @Query("SELECT r FROM Routine r JOIN FETCH r.owner ORDER BY r.createdAt DESC LIMIT 5")
+    List<Routine> findTop5WithOwner();
+
+    @Query("SELECT r FROM Routine r WHERE r.createdAt >= :desde ORDER BY r.createdAt ASC")
+    List<Routine> findByCreatedAtAfterOrderByCreatedAtAsc(@Param("desde") LocalDateTime desde);
+
+    long countByOwnerId(Long ownerId);
+
+    @Query("SELECT r.owner.id, COUNT(r) FROM Routine r WHERE r.owner.id IN :ids GROUP BY r.owner.id")
+    List<Object[]> countByOwnerIds(@Param("ids") List<Long> ids);
 }

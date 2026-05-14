@@ -39,6 +39,18 @@ public class User {
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0 NOT NULL")
+    private boolean suspended = false;
+
+    @Column(columnDefinition = "TEXT")
+    private String suspendedReason;
+
+    @Column
+    private LocalDateTime suspendedAt;
+
+    @Column
+    private LocalDateTime lastLoginAt;
+
     public Long getId() { return id; }
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
@@ -51,4 +63,12 @@ public class User {
     public UserRole getRole() { return role; }
     public void setRole(UserRole role) { this.role = role; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public boolean isSuspended() { return suspended; }
+    public void setSuspended(boolean suspended) { this.suspended = suspended; }
+    public String getSuspendedReason() { return suspendedReason; }
+    public void setSuspendedReason(String suspendedReason) { this.suspendedReason = suspendedReason; }
+    public LocalDateTime getSuspendedAt() { return suspendedAt; }
+    public void setSuspendedAt(LocalDateTime suspendedAt) { this.suspendedAt = suspendedAt; }
+    public LocalDateTime getLastLoginAt() { return lastLoginAt; }
+    public void setLastLoginAt(LocalDateTime lastLoginAt) { this.lastLoginAt = lastLoginAt; }
 }

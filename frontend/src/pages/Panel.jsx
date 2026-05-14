@@ -48,17 +48,19 @@ export default function Panel() {
   return (
     <div style={s.contenedor}>
 
-      <nav style={{ ...s.navbar, padding: isMobile ? '14px 20px' : '20px 40px' }}>
-        <span style={s.logo}>STRIVE</span>
+      <nav style={{ ...s.navbar, padding: isMobile ? '14px 20px' : '16px 40px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+          <span style={s.logo}>STRIVE</span>
 
-        {/* Nav links solo en escritorio */}
-        {!isMobile && (
-          <div style={s.navLinks}>
-            <button style={s.navLink} onClick={() => navigate('/ejercicios')}>Ejercicios</button>
-            <button style={s.navLink} onClick={() => navigate('/panel')}>Mis rutinas</button>
-            <button style={s.navLink} onClick={() => navigate('/historial')}>Historial</button>
-          </div>
-        )}
+          {/* Nav links solo en escritorio */}
+          {!isMobile && (
+            <div style={s.navLinks}>
+              <button style={s.navLinkActive} onClick={() => navigate('/panel')}>Mis rutinas</button>
+              <button style={s.navLink} onClick={() => navigate('/ejercicios')}>Ejercicios</button>
+              <button style={s.navLink} onClick={() => navigate('/historial')}>Historial</button>
+            </div>
+          )}
+        </div>
 
         <div style={s.navDerecha}>
           {!isMobile && (
@@ -68,22 +70,23 @@ export default function Panel() {
         </div>
       </nav>
 
-      <main style={{ ...s.main, padding: isMobile ? '24px 16px' : '40px' }}>
+      <main style={{ ...s.main, padding: isMobile ? '24px 16px' : '32px 40px' }}>
 
         <div style={{
           ...s.cabecera,
           flexDirection: isMobile ? 'column' : 'row',
-          alignItems: isMobile ? 'flex-start' : 'center',
-          marginBottom: isMobile ? '28px' : '40px',
+          alignItems: isMobile ? 'flex-start' : 'flex-end',
+          marginBottom: isMobile ? '24px' : '28px',
         }}>
           <div>
+            <span style={s.eyebrow}>Panel</span>
             <h1 style={{ ...s.titulo, fontSize: isMobile ? '32px' : '42px' }}>
               Mis rutinas
             </h1>
             <p style={s.subtitulo}>
               {rutinas.length === 0
                 ? 'Aún no tienes rutinas. ¡Crea tu primera!'
-                : `Tienes ${rutinas.length} rutina${rutinas.length > 1 ? 's' : ''}`}
+                : <>Tienes <strong style={{ color: '#fff', fontWeight: 600 }}>{rutinas.length} rutina{rutinas.length > 1 ? 's' : ''}</strong></>}
             </p>
           </div>
           <div style={{
@@ -145,10 +148,11 @@ export default function Panel() {
         {!cargando && rutinasFlash.length > 0 && (
           <div style={s.seccionFlash}>
             <div style={s.seccionHeader}>
-              <span style={s.seccionIcono}>⚡</span>
+              <span style={s.seccionIconWrap}>⚡</span>
               <h2 style={s.seccionTitulo}>Flash Training activos</h2>
+              <span style={s.seccionRule} />
             </div>
-            <div style={{ ...s.grid, gap: isMobile ? '16px' : '24px' }}>
+            <div style={{ ...s.grid, gap: isMobile ? '16px' : '20px' }}>
               {rutinasFlash.map(rutina => (
                 <TarjetaFlash
                   key={rutina.id}
@@ -165,29 +169,18 @@ export default function Panel() {
         {!cargando && rutinasNormales.length > 0 && (
           <>
             {rutinasFlash.length > 0 && (
-              <h2 style={s.seccionTituloNormal}>Rutinas guardadas</h2>
+              <div style={s.seccionHeader}>
+                <h2 style={s.seccionTituloNormal}>Rutinas guardadas</h2>
+                <span style={s.seccionRule} />
+              </div>
             )}
-            <div style={{ ...s.grid, gap: isMobile ? '16px' : '24px' }}>
+            <div style={{ ...s.grid, gap: isMobile ? '16px' : '20px' }}>
               {rutinasNormales.map(rutina => (
-                <div
+                <TarjetaRutinaNormal
                   key={rutina.id}
-                  style={s.tarjeta}
+                  rutina={rutina}
                   onClick={() => navigate(`/rutina/${rutina.id}`)}
-                >
-                  <div style={s.tarjetaAccento} />
-                  <div style={s.tarjetaContenido}>
-                    <h3 style={s.tarjetaTitulo}>{rutina.name}</h3>
-                    <p style={s.tarjetaDescripcion}>{rutina.goal || 'Sin descripción'}</p>
-                    <div style={s.tarjetaPie}>
-                      <span style={s.tarjetaBadge}>
-                        {rutina.routineExercises?.length || 0} ejercicios
-                      </span>
-                      <span style={s.tarjetaFecha}>
-                        {new Date(rutina.createdAt).toLocaleDateString('es-ES')}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                />
               ))}
             </div>
           </>
@@ -199,31 +192,77 @@ export default function Panel() {
   )
 }
 
+// ─── Tarjeta Rutina Normal ───────────────────────────────────────────────────
+function TarjetaRutinaNormal({ rutina, onClick }) {
+  const numEjercicios = rutina.routineExercises?.length || 0
+  const fecha = new Date(rutina.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+  return (
+    <div className="card-press" style={s.tarjeta} onClick={onClick}>
+      {/* glow vertical interno */}
+      <span style={s.tarjetaInsetGlow} />
+
+      <div style={s.tarjetaContenido}>
+        <div style={s.tarjetaCabecera}>
+          <div>
+            <span style={s.eyebrowSmall}>Rutina</span>
+            <h3 style={s.tarjetaTitulo}>{rutina.name}</h3>
+            <p style={s.tarjetaDescripcion}>{rutina.goal || 'Sin descripción'}</p>
+          </div>
+          <span style={s.tarjetaArrow} aria-hidden>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M13 5l7 7-7 7"/>
+            </svg>
+          </span>
+        </div>
+
+        <div style={s.tarjetaStats}>
+          <Stat label="Ejercicios" value={String(numEjercicios).padStart(2, '0')} />
+          <Stat label="Creada" value={fecha} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Stat({ label, value }) {
+  return (
+    <div>
+      <div style={s.statValue}>{value}</div>
+      <div style={s.statLabel}>{label}</div>
+    </div>
+  )
+}
+
 // ─── Tarjeta Flash ────────────────────────────────────────────────────────────
 function TarjetaFlash({ rutina, onClick, onExpire }) {
   return (
-    <div style={s.tarjetaFlash} onClick={onClick}>
-      <div style={s.flashBarra} />
-      <div style={s.tarjetaContenido}>
+    <div className="card-press" style={s.tarjetaFlash} onClick={onClick}>
+      <span style={s.flashTopStrip} />
+      <div style={s.tarjetaContenidoFlash}>
         <div style={s.flashCabecera}>
-          <span style={s.flashBadge}>⚡ FLASH</span>
+          <div>
+            <span style={s.flashBadge}>
+              <span style={{ marginRight: 4 }}>⚡</span>FLASH
+            </span>
+            <h3 style={{ ...s.tarjetaTitulo, marginTop: 10 }}>{rutina.name}</h3>
+            <p style={s.tarjetaDescripcion}>{rutina.goal || 'Sin descripción'}</p>
+          </div>
           <div style={s.cronometroWrap}>
             <span style={s.cronometroLabel}>Expira en</span>
             <CronometroRegresivo
               expiresAt={rutina.flashExpiresAt}
               onExpire={onExpire}
+              estiloTexto={s.cronometroBig}
             />
           </div>
         </div>
-        <h3 style={s.tarjetaTitulo}>{rutina.name}</h3>
-        <p style={s.tarjetaDescripcion}>{rutina.goal || 'Sin descripción'}</p>
-        <div style={s.tarjetaPie}>
-          <span style={{ ...s.tarjetaBadge, ...s.flashBadgeCount }}>
-            {rutina.routineExercises?.length || 0} ejercicios
-          </span>
-          <span style={s.tarjetaFecha}>
-            {new Date(rutina.createdAt).toLocaleDateString('es-ES')}
-          </span>
+        <div style={s.tarjetaStatsFlash}>
+          <Stat label="Ejercicios" value={String(rutina.routineExercises?.length || 0).padStart(2, '0')} />
+          <div>
+            <div style={{ ...s.statValue, color: '#FFB37A' }}>Flash</div>
+            <div style={s.statLabel}>Modo</div>
+          </div>
         </div>
       </div>
     </div>
@@ -242,207 +281,309 @@ const s = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottom: '1px solid rgba(255,255,255,0.08)',
-    backgroundColor: '#111111',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    background: 'rgba(15,15,15,0.86)',
+    backdropFilter: 'blur(14px)',
+    WebkitBackdropFilter: 'blur(14px)',
     position: 'sticky',
     top: 0,
     zIndex: 100,
   },
   logo: {
     fontFamily: "'Oswald', sans-serif",
-    fontSize: '24px',
+    fontSize: '22px',
     fontWeight: '700',
     fontStyle: 'italic',
     color: '#E63946',
     letterSpacing: '2px',
     userSelect: 'none',
   },
-  navLinks: { display: 'flex', gap: '8px' },
+  navLinks: { display: 'flex', gap: '4px' },
   navLink: {
     backgroundColor: 'transparent',
     border: 'none',
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: '15px',
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: '13px',
     fontFamily: "'Inter', sans-serif",
-    padding: '8px 16px',
+    fontWeight: 400,
+    padding: '8px 14px',
     borderRadius: '8px',
+    cursor: 'pointer',
+  },
+  navLinkActive: {
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: '#FFFFFF',
+    fontSize: '13px',
+    fontFamily: "'Inter', sans-serif",
+    fontWeight: 600,
+    padding: '8px 14px',
+    boxShadow: 'inset 0 -2px 0 #E63946',
     cursor: 'pointer',
   },
   navDerecha: { display: 'flex', alignItems: 'center', gap: '16px' },
   nombreUsuario: {
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.6)',
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.45)',
     fontFamily: "'Inter', sans-serif",
   },
-  main: { maxWidth: '1200px', margin: '0 auto' },
+  main: { maxWidth: '1280px', margin: '0 auto' },
+
   cabecera: {
     display: 'flex',
     flexWrap: 'wrap',
     gap: '16px',
+    justifyContent: 'space-between',
+  },
+  eyebrow: {
+    display: 'inline-block',
+    fontFamily: "'Inter', sans-serif",
+    fontSize: '10px', fontWeight: 600,
+    letterSpacing: '1.5px', textTransform: 'uppercase',
+    padding: '4px 10px',
+    borderRadius: '999px',
+    background: 'rgba(230,57,70,0.10)',
+    color: '#FF6B7A',
+    border: '1px solid rgba(230,57,70,0.30)',
+    marginBottom: '12px',
+  },
+  eyebrowSmall: {
+    display: 'inline-block',
+    fontFamily: "'Inter', sans-serif",
+    fontSize: '9px', fontWeight: 600,
+    letterSpacing: '1.5px', textTransform: 'uppercase',
+    padding: '3px 8px',
+    borderRadius: '999px',
+    background: 'rgba(230,57,70,0.10)',
+    color: '#FF6B7A',
+    border: '1px solid rgba(230,57,70,0.30)',
+    marginBottom: '8px',
   },
   titulo: {
     fontFamily: "'Oswald', sans-serif",
-    fontWeight: '700',
+    fontWeight: 700,
     textTransform: 'uppercase',
-    marginBottom: '8px',
+    letterSpacing: '1px',
+    margin: '0 0 6px',
+    background: 'linear-gradient(180deg, #FFFFFF 0%, rgba(255,255,255,0.55) 130%)',
+    WebkitBackgroundClip: 'text',
+    backgroundClip: 'text',
+    color: 'transparent',
   },
   subtitulo: {
-    fontSize: '15px',
-    color: 'rgba(255,255,255,0.5)',
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.45)',
     fontFamily: "'Inter', sans-serif",
+    margin: 0,
   },
-  acciones: { display: 'flex', gap: '12px' },
+  acciones: { display: 'flex', gap: '10px' },
+
   botonFlash: {
-    background: 'linear-gradient(90deg, #FF8C42, #FF4D4D)',
+    background: 'linear-gradient(90deg, #FF8C42 0%, #FF4D4D 100%)',
     color: '#FFFFFF',
-    border: 'none',
-    padding: '14px 24px',
-    borderRadius: '8px',
-    fontSize: '15px',
-    fontWeight: '700',
+    border: '1px solid transparent',
+    padding: '0 20px',
+    height: '46px',
+    borderRadius: '10px',
+    fontSize: '13px',
+    fontWeight: 700,
     fontFamily: "'Oswald', sans-serif",
-    letterSpacing: '1px',
+    letterSpacing: '1.4px',
     textTransform: 'uppercase',
     cursor: 'pointer',
-    boxShadow: '0 0 16px rgba(255,140,66,0.25)',
-    minHeight: '50px',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 24px rgba(255,140,66,0.35), 0 0 0 1px rgba(255,140,66,0.45)',
   },
   botonNueva: {
-    backgroundColor: '#E63946',
+    background: 'linear-gradient(180deg, #EB4451 0%, #D52E3B 100%)',
     color: '#FFFFFF',
-    border: 'none',
-    padding: '14px 28px',
-    borderRadius: '8px',
-    fontSize: '15px',
-    fontWeight: '700',
+    border: '1px solid rgba(230,57,70,0.85)',
+    padding: '0 20px',
+    height: '46px',
+    borderRadius: '10px',
+    fontSize: '13px',
+    fontWeight: 700,
     fontFamily: "'Oswald', sans-serif",
-    letterSpacing: '1px',
+    letterSpacing: '1.4px',
     textTransform: 'uppercase',
     cursor: 'pointer',
-    minHeight: '50px',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -1px 0 rgba(0,0,0,0.20), 0 8px 22px rgba(230,57,70,0.32)',
   },
+
   estadoCentro: { textAlign: 'center', padding: '80px 0' },
-  textoCentro: { color: 'rgba(255,255,255,0.4)', fontFamily: "'Inter', sans-serif" },
+  textoCentro: { color: 'rgba(255,255,255,0.45)', fontFamily: "'Inter', sans-serif" },
+
   vacio: {
     textAlign: 'center',
-    padding: '80px 0',
+    padding: '64px 0',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '16px',
+    gap: '14px',
   },
-  vaciIcono: { fontSize: '64px' },
+  vaciIcono: { fontSize: '56px', opacity: 0.75 },
   vacioTitulo: {
     fontFamily: "'Oswald', sans-serif",
-    fontSize: '28px',
-    fontWeight: '600',
+    fontSize: '26px',
+    fontWeight: 600,
     textTransform: 'uppercase',
+    margin: 0,
   },
   vacioTexto: {
-    fontSize: '15px',
-    color: 'rgba(255,255,255,0.5)',
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.45)',
     fontFamily: "'Inter', sans-serif",
+    margin: 0,
   },
   botonCrear: {
-    backgroundColor: '#E63946',
+    background: 'linear-gradient(180deg, #EB4451 0%, #D52E3B 100%)',
     color: '#FFFFFF',
-    border: 'none',
-    padding: '14px 32px',
-    borderRadius: '8px',
-    fontSize: '15px',
-    fontWeight: '700',
+    border: '1px solid rgba(230,57,70,0.85)',
+    padding: '0 28px',
+    height: '46px',
+    borderRadius: '10px',
+    fontSize: '13px',
+    fontWeight: 700,
     fontFamily: "'Oswald', sans-serif",
-    letterSpacing: '1px',
+    letterSpacing: '1.4px',
     textTransform: 'uppercase',
     cursor: 'pointer',
-    minHeight: '50px',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 22px rgba(230,57,70,0.32)',
   },
-  seccionFlash: { marginBottom: '48px' },
-  seccionHeader: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' },
-  seccionIcono: { fontSize: '20px' },
+
+  seccionFlash: { marginBottom: '36px' },
+  seccionHeader: {
+    display: 'flex', alignItems: 'center', gap: '10px',
+    marginBottom: '16px',
+  },
+  seccionIconWrap: {
+    fontSize: '14px',
+    width: 22, height: 22, borderRadius: '50%',
+    background: 'rgba(255,140,66,0.12)',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    color: '#FFB37A',
+  },
   seccionTitulo: {
     fontFamily: "'Oswald', sans-serif",
-    fontSize: '18px',
-    fontWeight: '700',
+    fontSize: '13px',
+    fontWeight: 700,
     textTransform: 'uppercase',
-    letterSpacing: '1px',
-    color: '#FF8C42',
+    letterSpacing: '1.5px',
+    color: '#FFB37A',
+    margin: 0,
   },
   seccionTituloNormal: {
     fontFamily: "'Oswald', sans-serif",
-    fontSize: '18px',
-    fontWeight: '700',
+    fontSize: '13px',
+    fontWeight: 700,
     textTransform: 'uppercase',
-    letterSpacing: '1px',
-    color: 'rgba(255,255,255,0.5)',
-    marginBottom: '20px',
+    letterSpacing: '1.5px',
+    color: 'rgba(255,255,255,0.45)',
+    margin: 0,
   },
+  seccionRule: {
+    flex: 1, height: 1,
+    background: 'linear-gradient(90deg, rgba(255,255,255,0.10), transparent)',
+  },
+
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
   },
+
   // ── Tarjeta normal ──
   tarjeta: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: '12px',
+    position: 'relative',
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 50%), #141414',
+    border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: '16px',
     overflow: 'hidden',
     cursor: 'pointer',
-    display: 'flex',
-    transition: 'transform 0.2s',
+    boxShadow: '0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.45)',
   },
-  tarjetaAccento: { width: '4px', backgroundColor: '#E63946', flexShrink: 0 },
-  tarjetaContenido: { padding: '24px', flex: 1 },
-  tarjetaTitulo: {
-    fontFamily: "'Oswald', sans-serif",
-    fontSize: '20px',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    marginBottom: '8px',
+  tarjetaInsetGlow: {
+    position: 'absolute', top: 14, bottom: 14, left: 0, width: 3,
+    borderRadius: '0 3px 3px 0',
+    background: 'linear-gradient(180deg, transparent, #E63946 30%, #E63946 70%, transparent)',
+    boxShadow: '0 0 18px rgba(230,57,70,0.55)',
   },
-  tarjetaDescripcion: {
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.5)',
-    fontFamily: "'Inter', sans-serif",
-    marginBottom: '20px',
-    lineHeight: '1.5',
-  },
-  tarjetaPie: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  tarjetaBadge: {
-    backgroundColor: 'rgba(230, 57, 70, 0.15)',
-    color: '#E63946',
-    padding: '4px 10px',
-    borderRadius: '20px',
-    fontSize: '12px',
-    fontWeight: '600',
-    fontFamily: "'Inter', sans-serif",
-  },
-  tarjetaFecha: {
-    fontSize: '12px',
-    color: 'rgba(255,255,255,0.3)',
-    fontFamily: "'Inter', sans-serif",
-  },
-  // ── Tarjeta Flash ──
-  tarjetaFlash: {
-    background: 'linear-gradient(135deg, #1a0a05 0%, #111 55%, #0a0a1a 100%)',
-    border: '1px solid rgba(255,140,66,0.35)',
-    borderRadius: '12px',
-    overflow: 'hidden',
-    cursor: 'pointer',
+  tarjetaContenido: {
+    padding: '20px 24px',
     display: 'flex',
     flexDirection: 'column',
-    boxShadow: '0 0 24px rgba(255,140,66,0.1)',
-    transition: 'box-shadow 0.2s',
+    gap: '16px',
   },
-  flashBarra: {
-    height: '3px',
-    background: 'linear-gradient(90deg, #FF8C42, #FF4D4D, #FF8C42)',
+  tarjetaCabecera: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12,
+  },
+  tarjetaTitulo: {
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: '22px',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+    margin: '0 0 4px',
+  },
+  tarjetaDescripcion: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.45)',
+    fontFamily: "'Inter', sans-serif",
+    lineHeight: 1.5,
+    margin: 0,
+  },
+  tarjetaArrow: {
+    width: 32, height: 32, borderRadius: '50%',
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.10)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: 'rgba(255,255,255,0.72)',
     flexShrink: 0,
   },
+  tarjetaStats: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '12px',
+    paddingTop: '12px',
+    borderTop: '1px solid rgba(255,255,255,0.06)',
+  },
+  statValue: {
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: '20px',
+    lineHeight: 1,
+    color: '#FFFFFF',
+  },
+  statLabel: {
+    fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+    marginTop: 4,
+    fontSize: '9px',
+    letterSpacing: '1.4px',
+    textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.28)',
+  },
+
+  // ── Tarjeta Flash ──
+  tarjetaFlash: {
+    position: 'relative',
+    background: `
+      radial-gradient(120% 80% at 0% 0%, rgba(255,140,66,0.18), transparent 55%),
+      radial-gradient(120% 80% at 100% 100%, rgba(230,57,70,0.16), transparent 55%),
+      linear-gradient(180deg, #1a0e08, #0f0d0e)
+    `,
+    border: '1px solid rgba(255,140,66,0.30)',
+    borderRadius: '16px',
+    overflow: 'hidden',
+    cursor: 'pointer',
+    boxShadow: '0 8px 28px rgba(255,140,66,0.34), 0 1px 0 rgba(255,255,255,0.04) inset',
+  },
+  flashTopStrip: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+    background: 'linear-gradient(90deg, transparent, #FF8C42, #FF4D4D, #FF8C42, transparent)',
+  },
+  tarjetaContenidoFlash: {
+    padding: '20px 24px',
+    display: 'flex', flexDirection: 'column', gap: '16px',
+  },
   flashCabecera: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '10px',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12,
   },
   flashBadge: {
     display: 'inline-block',
@@ -450,24 +591,39 @@ const s = {
     color: '#fff',
     fontSize: '10px',
     fontFamily: "'Oswald', sans-serif",
-    fontWeight: '700',
+    fontWeight: 700,
     letterSpacing: '1.5px',
     padding: '3px 10px',
-    borderRadius: '20px',
+    borderRadius: '999px',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.22)',
   },
   cronometroWrap: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-end',
-    gap: '2px',
+    gap: '4px',
+    flexShrink: 0,
   },
   cronometroLabel: {
-    fontSize: '10px',
-    color: 'rgba(255,255,255,0.35)',
-    fontFamily: "'Inter', sans-serif",
+    fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+    fontSize: '9px',
+    letterSpacing: '1.4px',
+    textTransform: 'uppercase',
+    color: 'rgba(255,179,122,0.7)',
   },
-  flashBadgeCount: {
-    backgroundColor: 'rgba(255,140,66,0.15)',
-    color: '#FF8C42',
+  cronometroBig: {
+    fontFamily: "'Oswald', sans-serif",
+    fontWeight: 700,
+    fontSize: '22px',
+    color: '#FFB37A',
+    lineHeight: 1,
+    textShadow: '0 0 14px rgba(255,140,66,0.5)',
+  },
+  tarjetaStatsFlash: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '12px',
+    paddingTop: '12px',
+    borderTop: '1px solid rgba(255,140,66,0.18)',
   },
 }

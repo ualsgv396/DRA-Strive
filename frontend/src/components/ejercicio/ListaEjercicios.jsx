@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
 import TarjetaEjercicio from './TarjetaEjercicio'
+import { useState, useEffect } from 'react'
 
 export default function ListaEjercicios({
   ejercicios, cargando, onVerDetalles,
@@ -35,7 +35,7 @@ export default function ListaEjercicios({
     return (
       <div style={s.centro}>
         <div style={s.spinner} />
-        <p style={{ color: '#888', margin: 0 }}>Cargando ejercicios...</p>
+        <p style={{ color: 'rgba(255,255,255,0.45)', margin: 0, fontSize: 13 }}>Cargando ejercicios...</p>
       </div>
     )
   }
@@ -43,10 +43,10 @@ export default function ListaEjercicios({
   if (filtrados.length === 0) {
     return (
       <div style={s.centro}>
-        <span style={{ fontSize: '40px' }}>🔍</span>
-        <p style={{ color: '#aaa', margin: 0 }}>No se encontraron ejercicios</p>
+        <span style={{ fontSize: '40px', opacity: 0.65 }}>🔍</span>
+        <p style={{ color: 'rgba(255,255,255,0.72)', margin: 0 }}>No se encontraron ejercicios</p>
         {(filtro || tipoFiltro || muscleGroupFiltro) &&
-          <p style={{ fontSize: '13px', color: '#bbb', margin: 0 }}>Prueba a cambiar los filtros</p>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.45)', margin: 0 }}>Prueba a cambiar los filtros</p>
         }
       </div>
     )
@@ -78,7 +78,7 @@ const s = {
   },
   spinner: {
     width: '36px', height: '36px',
-    border: '3px solid #f0f0f0',
+    border: '3px solid rgba(255,255,255,0.08)',
     borderTop: '3px solid #E63946',
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite'

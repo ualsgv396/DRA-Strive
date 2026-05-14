@@ -13,8 +13,8 @@ const NAV_ITEMS = [
   { label: 'EJERCICIOS', Icon: BookletLineIcon,  ruta: '/ejercicios'   },
 ]
 
-const GRAY   = '#9CA3AF'
-const RED    = '#FF414D'
+const GRAY_INACTIVE = 'rgba(255,255,255,0.55)'
+const RED           = '#FF6B7A'
 
 export default function BottomNav() {
   const location = useLocation()
@@ -32,9 +32,14 @@ export default function BottomNav() {
                  w-full max-w-[940px]
                  flex items-center justify-around
                  px-2 pt-2
-                 bg-[#121212] border-t border-white/[0.07]
-                 shadow-[0_-8px_32px_rgba(0,0,0,0.45)]"
-      style={{ paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))' }}
+                 border-t border-white/[0.06]"
+      style={{
+        paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))',
+        background: 'rgba(15,15,15,0.86)',
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
+        boxShadow: '0 -10px 36px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.03) inset',
+      }}
     >
       {NAV_ITEMS.map(({ label, Icon, ruta }) => {
         const activa = esActiva(ruta)
@@ -47,27 +52,31 @@ export default function BottomNav() {
             aria-label={label}
             className={[
               'flex flex-col items-center justify-center gap-1',
-              'min-h-[52px] min-w-[44px] flex-1 max-w-[88px]',
+              'min-h-[54px] min-w-[48px] flex-1 max-w-[88px]',
               'rounded-xl px-1 py-2',
               'cursor-pointer select-none',
               'transition-all duration-150',
-              '-webkit-tap-highlight-color-transparent',
-              activa
-                ? 'bg-[rgba(255,65,77,0.12)] shadow-[inset_0_0_0_1px_rgba(255,65,77,0.35)]'
-                : 'hover:bg-white/5 active:scale-95',
+              activa ? '' : 'hover:bg-white/[0.04] active:scale-95',
             ].join(' ')}
+            style={
+              activa
+                ? {
+                    background: 'rgba(230,57,70,0.10)',
+                    boxShadow: 'inset 0 0 0 1px rgba(230,57,70,0.40), 0 0 22px rgba(230,57,70,0.18)',
+                  }
+                : undefined
+            }
           >
-            <Icon size={24} color={activa ? RED : GRAY} />
+            <Icon size={22} color={activa ? RED : GRAY_INACTIVE} />
             <span
-              className="font-['Inter'] text-[9px] font-semibold tracking-wide uppercase leading-none"
-              style={{ color: activa ? RED : GRAY }}
+              className="font-['Inter'] text-[9px] font-semibold tracking-wider uppercase leading-none"
+              style={{ color: activa ? RED : GRAY_INACTIVE, letterSpacing: '1.2px' }}
             >
               {label}
             </span>
           </button>
         )
       })}
-
     </nav>
   )
 }

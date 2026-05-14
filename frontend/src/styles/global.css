@@ -2,6 +2,7 @@
 
 /* ── Design tokens ── */
 :root {
+  /* —— GUÍA DE ESTILOS (sin cambios) —— */
   --primary-red:      #E63946;
   --primary-red-dark: #C1121F;
   --orange:           #FF8C42;
@@ -20,6 +21,45 @@
 
   /* iOS safe area (env() hace fallback a 0px en escritorio) */
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* —— TOKENS DERIVADOS (refinamiento UI, no rompen nada) —— */
+
+  /* Superficies en 4 niveles sobre el bg base #0D0D0D */
+  --bg-1: #0D0D0D;   /* canvas */
+  --bg-2: #131313;   /* surface */
+  --bg-3: #1A1A1A;   /* raised card */
+  --bg-4: #222222;   /* input / chip */
+
+  /* Líneas */
+  --line-1: rgba(255,255,255,0.06);
+  --line-2: rgba(255,255,255,0.10);
+  --line-3: rgba(255,255,255,0.14);
+
+  /* Texto sobre dark */
+  --txt-1: rgba(255,255,255,1);
+  --txt-2: rgba(255,255,255,0.72);
+  --txt-3: rgba(255,255,255,0.45);
+  --txt-4: rgba(255,255,255,0.28);
+
+  /* Escala 4 / 8 px */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-7: 28px; --s-8: 32px;
+  --s-10: 40px; --s-12: 48px;
+
+  /* Radii armonizados */
+  --r-xs: 6px;  --r-sm: 8px;  --r-md: 12px;
+  --r-lg: 16px; --r-xl: 20px; --r-pill: 999px;
+
+  /* Elevación tipada */
+  --shadow-1: 0 1px 0 rgba(255,255,255,0.03) inset, 0 1px 2px rgba(0,0,0,0.5);
+  --shadow-2: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.45);
+  --shadow-3: 0 1px 0 rgba(255,255,255,0.05) inset, 0 18px 48px rgba(0,0,0,0.6);
+  --glow-red:    0 8px 28px rgba(230,57,70,0.32);
+  --glow-orange: 0 8px 28px rgba(255,140,66,0.34);
+
+  /* Transiciones consistentes */
+  --t-fast:   140ms cubic-bezier(.2,.7,.2,1);
+  --t-base:   220ms cubic-bezier(.2,.7,.2,1);
 }
 
 /* ── Box model global ── */
@@ -35,8 +75,9 @@ button, a, img, [role="button"] {
 }
 
 /* ── Scrollbar custom (escritorio) ── */
-::-webkit-scrollbar          { width: 5px; height: 5px; }
-::-webkit-scrollbar-thumb    { background: rgba(255,255,255,0.15); border-radius: 3px; }
+::-webkit-scrollbar          { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb    { background: rgba(255,255,255,0.12); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.20); }
 ::-webkit-scrollbar-track    { background: transparent; }
 
 /* ── Scroll horizontal sin scrollbar visible (fila de chips) ── */
@@ -54,7 +95,9 @@ button, a, img, [role="button"] {
 .sheet-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.55);
+  background: rgba(0,0,0,0.60);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   z-index: 400;
   display: flex;
   align-items: flex-end;
@@ -112,10 +155,33 @@ input, textarea, select, button {
   cursor: pointer;
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+/* Quita el spin del numeric input para no romper la cuadrícula del Registro */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
+
+/* ── Focus ring unificado (rojo en CTAs, naranja en inputs) ── */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid rgba(230,57,70,0.55);
+  outline-offset: 2px;
 }
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--primary-red) !important;
+  box-shadow: 0 0 0 3px rgba(230,57,70,0.18);
+}
+
+/* ── Hover-lift utilitario para cards clicables (.card-press) ── */
+.card-press {
+  transition: transform var(--t-fast), box-shadow var(--t-fast), border-color var(--t-fast);
+  will-change: transform;
+}
+.card-press:hover  { transform: translateY(-2px); box-shadow: var(--shadow-3); border-color: var(--line-2); }
+.card-press:active { transform: translateY(0); }
 
 /* ── Botón cerrar sesión (glow pulsante) ── */
 @keyframes logoutGlow {

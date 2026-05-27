@@ -10,10 +10,11 @@ services:
     volumes:
       - strive_mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   backend:
     build: ./backend
@@ -21,13 +22,7 @@ services:
     restart: always
     ports:
       - "8080:8080"
-    env_file: .env
-    environment:
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
-      APP_JWT_SECRET: ${APP_JWT_SECRET}
-      APP_JWT_EXPIRATION_MS: ${APP_JWT_EXPIRATION_MS}
+    env_file: .env 
     depends_on:
       mysql:
         condition: service_healthy
@@ -35,12 +30,16 @@ services:
   frontend:
     build:
       context: ./frontend
+      dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL}
+        # Docker Compose busca automáticamente en el archivo .env de la raíz
+        # para inyectar este valor durante el "npm run build" de Vite
+        - VITE_API_URL=${VITE_API_URL}
     container_name: strive-frontend
     restart: always
     ports:
       - "5173:80"
+    env_file: .env  
     depends_on:
       - backend
 

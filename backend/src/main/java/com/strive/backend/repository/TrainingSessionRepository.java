@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface TrainingSessionRepository extends JpaRepository<TrainingSession, Long> {
+    void deleteAllByRoutineId(Long routineId);
     List<TrainingSession> findTop30ByUserIdOrderByStartedAtDesc(Long userId);
     List<TrainingSession> findByUserIdAndStatusOrderByStartedAtDesc(Long userId, TrainingSessionStatus status);
     List<TrainingSession> findByRoutineIdAndUserIdOrderByStartedAtDesc(Long routineId, Long userId);

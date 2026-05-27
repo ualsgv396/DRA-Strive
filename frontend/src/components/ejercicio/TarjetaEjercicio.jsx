@@ -1,4 +1,4 @@
-export default function TarjetaEjercicio({ ejercicio, onVerDetalles }) {
+export default function TarjetaEjercicio({ ejercicio, onVerDetalles, esFavorito, onToggleFavorito }) {
   const tone = toneFromType(ejercicio.type)
 
   return (
@@ -31,18 +31,39 @@ export default function TarjetaEjercicio({ ejercicio, onVerDetalles }) {
           {ejercicio.type ?? 'General'}
         </span>
 
-        {/* Botón "arrow" decorativo (afordancia de clickeable) */}
-        <span style={s.arrowChip} aria-hidden>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12h14M13 5l7 7-7 7"/>
-          </svg>
-        </span>
+        {/* Botón favorito */}
+        {onToggleFavorito ? (
+          <button
+            style={{ ...s.arrowChip, ...(esFavorito ? s.favActivo : {}) }}
+            onClick={e => { e.stopPropagation(); onToggleFavorito(ejercicio.id) }}
+            aria-label={esFavorito ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24"
+                 fill={esFavorito ? 'currentColor' : 'none'}
+                 stroke="currentColor" strokeWidth="2.2"
+                 strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+          </button>
+        ) : (
+          <span style={s.arrowChip} aria-hidden>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M13 5l7 7-7 7"/>
+            </svg>
+          </span>
+        )}
       </div>
 
       {/* Contenido */}
       <div style={s.contenido}>
         <h3 style={s.titulo}>{ejercicio.title}</h3>
+
+        {ejercicio.difficulty && (
+          <span style={{ ...s.dificultadBadge, ...difficultyStyle(ejercicio.difficulty) }}>
+            {ejercicio.difficulty}
+          </span>
+        )}
 
         {(ejercicio.muscleGroups ?? []).length > 0 && (
           <div style={s.grupos}>
@@ -73,6 +94,15 @@ export default function TarjetaEjercicio({ ejercicio, onVerDetalles }) {
       </div>
     </div>
   )
+}
+
+function difficultyStyle(level) {
+  switch (level) {
+    case 'PRINCIPIANTE': return { color: '#4ADE80', borderColor: 'rgba(74,222,128,0.35)',  background: 'rgba(74,222,128,0.08)'  }
+    case 'INTERMEDIO':   return { color: '#FBB740', borderColor: 'rgba(251,183,64,0.35)',  background: 'rgba(251,183,64,0.08)'  }
+    case 'AVANZADO':     return { color: '#FF6B7A', borderColor: 'rgba(230,57,70,0.35)',   background: 'rgba(230,57,70,0.08)'   }
+    default:             return { color: 'rgba(255,255,255,0.45)', borderColor: 'rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.03)' }
+  }
 }
 
 function toneFromType(type) {
@@ -133,7 +163,14 @@ const s = {
     WebkitBackdropFilter: 'blur(8px)',
     border: '1px solid rgba(255,255,255,0.10)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: '#fff',
+    color: 'rgba(255,255,255,0.7)',
+    cursor: 'pointer', padding: 0,
+    transition: 'color 120ms ease, background 120ms ease, border-color 120ms ease',
+  },
+  favActivo: {
+    color: '#E63946',
+    borderColor: 'rgba(230,57,70,0.45)',
+    background: 'rgba(230,57,70,0.18)',
   },
   contenido: { padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 },
   titulo: {
@@ -145,6 +182,15 @@ const s = {
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
   },
   grupos: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
+  dificultadBadge: {
+    display: 'inline-flex', alignItems: 'center',
+    alignSelf: 'flex-start',
+    padding: '3px 9px',
+    borderRadius: 999,
+    border: '1px solid',
+    fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+    fontSize: 10, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase',
+  },
   grupoBadge: {
     padding: '3px 9px', borderRadius: 999,
     fontSize: 11, fontWeight: 500,

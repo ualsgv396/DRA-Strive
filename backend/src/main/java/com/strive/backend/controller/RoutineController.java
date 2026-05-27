@@ -7,6 +7,7 @@ import com.strive.backend.domain.UserRole;
 import com.strive.backend.dto.AddExerciseToRoutineRequest;
 import com.strive.backend.dto.CreateFlashRoutineRequest;
 import com.strive.backend.dto.CreateRoutineRequest;
+import com.strive.backend.dto.PatchRoutineRequest;
 import com.strive.backend.dto.ReorderExerciseRequest;
 import com.strive.backend.dto.UpdateRoutineExerciseRequest;
 import com.strive.backend.exception.AccessDeniedException;
@@ -72,6 +73,12 @@ public class RoutineController {
         return routineService.updateRoutine(id, request);
     }
 
+    @PatchMapping("/{id}")
+    public Routine patch(@PathVariable Long id, @Valid @RequestBody PatchRoutineRequest request) {
+        requireOwnership(id);
+        return routineService.patchRoutine(id, request);
+    }
+
     @PostMapping("/{id}/exercises")
     @ResponseStatus(HttpStatus.CREATED)
     public RoutineExercise addExercise(
@@ -86,6 +93,14 @@ public class RoutineController {
                 request.loadValue(),
                 request.loadUnit()
         );
+    }
+
+    @PostMapping("/{id}/duplicate")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Routine duplicate(@PathVariable Long id) {
+        requireOwnership(id);
+        User currentUser = currentUserService.getCurrentUser();
+        return routineService.duplicateRoutine(id, currentUser.getId());
     }
 
     @DeleteMapping("/{id}")

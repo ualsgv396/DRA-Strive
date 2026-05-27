@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react'
 
 export default function ListaEjercicios({
   ejercicios, cargando, onVerDetalles,
-  filtro = '', tipoFiltro = null, muscleGroupFiltro = null
+  filtro = '', tipoFiltro = null, muscleGroupFiltro = null,
+  favoritos, onToggleFavorito
 }) {
   const [filtrados, setFiltrados] = useState(ejercicios)
 
@@ -59,6 +60,8 @@ export default function ListaEjercicios({
           key={ejercicio.id}
           ejercicio={ejercicio}
           onVerDetalles={onVerDetalles}
+          esFavorito={favoritos?.has(String(ejercicio.id))}
+          onToggleFavorito={onToggleFavorito}
         />
       ))}
     </div>

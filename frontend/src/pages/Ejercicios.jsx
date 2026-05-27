@@ -3,8 +3,10 @@ import { useResponsive } from '../hooks/useMediaQuery'
 import api from '../api/axios'
 import ListaEjercicios from '../components/ejercicio/ListaEjercicios'
 import ModalDetallesEjercicio from '../components/ejercicio/ModalDetallesEjercicio'
+import { useFavoritos } from '../hooks/useFavoritos'
 
 const TIPOS = ['CARDIO', 'FUERZA', 'MOVILIDAD']
+const DIFICULTADES = ['PRINCIPIANTE', 'INTERMEDIO', 'AVANZADO']
 
 /**
  * Imagen con lazy loading y fade-in progresivo.
@@ -35,13 +37,17 @@ export default function Ejercicios() {
   const [cargando,          setCargando         ] = useState(true)
   const [sincronizando,     setSincronizando    ] = useState(false)
   const [busqueda,          setBusqueda         ] = useState('')
-  const [tipoSeleccionado,  setTipoSeleccionado ] = useState(null)
-  const [grupoSeleccionado, setGrupoSeleccionado] = useState(null)
+  const [tipoSeleccionado,        setTipoSeleccionado       ] = useState(null)
+  const [dificultadSeleccionada,  setDificultadSeleccionada ] = useState(null)
+  const [grupoSeleccionado,       setGrupoSeleccionado      ] = useState(null)
   const [ejercicioDetalle,  setEjercicioDetalle ] = useState(null)
   const [error,             setError            ] = useState(null)
   const [exito,             setExito            ] = useState(null)
   // Estado exclusivo del bottom sheet de filtros
   const [drawerAbierto, setDrawerAbierto] = useState(false)
+
+  const { favoritos, toggleFavorito } = useFavoritos()
+  const [soloFavoritos, setSoloFavoritos] = useState(false)
 
   const drawerRef = useRef(null)
 
@@ -99,18 +105,18 @@ export default function Ejercicios() {
         e.muscleGroups?.some(g => g.toLowerCase().includes(q))
       )
     }
-    if (tipoSeleccionado) {
-      result = result.filter(e => e.type === tipoSeleccionado)
-    }
-    if (grupoSeleccionado) {
-      result = result.filter(e => (e.muscleGroups ?? []).includes(grupoSeleccionado))
-    }
+    if (tipoSeleccionado)       result = result.filter(e => e.type === tipoSeleccionado)
+    if (dificultadSeleccionada) result = result.filter(e => e.difficulty === dificultadSeleccionada)
+    if (grupoSeleccionado)      result = result.filter(e => (e.muscleGroups ?? []).includes(grupoSeleccionado))
+    if (soloFavoritos)          result = result.filter(e => favoritos.has(String(e.id)))
     return result
-  }, [ejercicios, busqueda, tipoSeleccionado, grupoSeleccionado])
+  }, [ejercicios, busqueda, tipoSeleccionado, dificultadSeleccionada, grupoSeleccionado, soloFavoritos, favoritos])
 
   const filtrosActivos =
-    (tipoSeleccionado  !== null ? 1 : 0) +
-    (grupoSeleccionado !== null ? 1 : 0)
+    (tipoSeleccionado        !== null ? 1 : 0) +
+    (dificultadSeleccionada  !== null ? 1 : 0) +
+    (grupoSeleccionado       !== null ? 1 : 0) +
+    (soloFavoritos           ? 1 : 0)
 
   // ── Chips de tipo (se renderizan en header desktop O en drawer móvil) ──
   const ChipsTipo = () => (
@@ -148,6 +154,26 @@ export default function Ejercicios() {
           onClick={() => setGrupoSeleccionado(grupoSeleccionado === g ? null : g)}
         >
           {g}
+        </button>
+      ))}
+    </>
+  )
+
+  const ChipsDificultad = () => (
+    <>
+      <button
+        style={{ ...s.chipGrupo, ...(dificultadSeleccionada === null ? s.chipGrupoActivo : {}) }}
+        onClick={() => setDificultadSeleccionada(null)}
+      >
+        Todas
+      </button>
+      {DIFICULTADES.map(d => (
+        <button
+          key={d}
+          style={{ ...s.chipGrupo, ...(dificultadSeleccionada === d ? s.chipGrupoActivo : {}) }}
+          onClick={() => setDificultadSeleccionada(dificultadSeleccionada === d ? null : d)}
+        >
+          {d}
         </button>
       ))}
     </>
@@ -204,6 +230,22 @@ export default function Ejercicios() {
           <>
             <div style={s.filtrosRow}>
               <ChipsTipo />
+              <button
+                style={{ ...s.chip, ...(soloFavoritos ? s.chipActivo : {}), display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                onClick={() => setSoloFavoritos(v => !v)}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24"
+                     fill={soloFavoritos ? 'currentColor' : 'none'}
+                     stroke="currentColor" strokeWidth="2.2"
+                     strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                </svg>
+                Favoritos{favoritos.size > 0 ? ` (${favoritos.size})` : ''}
+              </button>
+            </div>
+            <div style={s.filtrosRow}>
+              <span style={s.filtroLabel}>Dificultad:</span>
+              <ChipsDificultad />
             </div>
             {gruposMusculares.length > 0 && (
               <div style={s.filtrosRow}>
@@ -218,19 +260,23 @@ export default function Ejercicios() {
         {isMobile && filtrosActivos > 0 && (
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
             {tipoSeleccionado && (
-              <button
-                style={s.chipActivo2}
-                onClick={() => setTipoSeleccionado(null)}
-              >
+              <button style={s.chipActivo2} onClick={() => setTipoSeleccionado(null)}>
                 {tipoSeleccionado} ✕
               </button>
             )}
+            {dificultadSeleccionada && (
+              <button style={s.chipActivo2} onClick={() => setDificultadSeleccionada(null)}>
+                {dificultadSeleccionada} ✕
+              </button>
+            )}
             {grupoSeleccionado && (
-              <button
-                style={s.chipActivo2}
-                onClick={() => setGrupoSeleccionado(null)}
-              >
+              <button style={s.chipActivo2} onClick={() => setGrupoSeleccionado(null)}>
                 {grupoSeleccionado} ✕
+              </button>
+            )}
+            {soloFavoritos && (
+              <button style={s.chipActivo2} onClick={() => setSoloFavoritos(false)}>
+                ❤ Favoritos ✕
               </button>
             )}
           </div>
@@ -240,6 +286,8 @@ export default function Ejercicios() {
           ejercicios={ejerciciosFiltrados}
           cargando={cargando}
           onVerDetalles={setEjercicioDetalle}
+          favoritos={favoritos}
+          onToggleFavorito={toggleFavorito}
         />
       </main>
 
@@ -265,16 +313,35 @@ export default function Ejercicios() {
               {filtrosActivos > 0 && (
                 <button
                   style={s.btnLimpiar}
-                  onClick={() => { setTipoSeleccionado(null); setGrupoSeleccionado(null) }}
+                  onClick={() => { setTipoSeleccionado(null); setDificultadSeleccionada(null); setGrupoSeleccionado(null); setSoloFavoritos(false) }}
                 >
                   Limpiar todo
                 </button>
               )}
             </div>
 
+            <p style={s.drawerSeccion}>Favoritos</p>
+            <button
+              style={{ ...s.chipGrupo, ...(soloFavoritos ? s.chipGrupoActivo : {}), display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              onClick={() => setSoloFavoritos(v => !v)}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24"
+                   fill={soloFavoritos ? 'currentColor' : 'none'}
+                   stroke="currentColor" strokeWidth="2.2"
+                   strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+              </svg>
+              Solo favoritos{favoritos.size > 0 ? ` (${favoritos.size})` : ''}
+            </button>
+
             <p style={s.drawerSeccion}>Tipo de ejercicio</p>
             <div className="scroll-x" style={{ paddingBottom: '8px' }}>
               <ChipsTipo />
+            </div>
+
+            <p style={s.drawerSeccion}>Dificultad</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <ChipsDificultad />
             </div>
 
             {gruposMusculares.length > 0 && (

@@ -5,6 +5,7 @@ import ExportRoutinePDF from '../components/rutina/ExportRoutinePDF'
 import ItemEjercicioRutina from '../components/rutina/ItemEjercicioRutina'
 import EditarEjercicioRutina from '../components/rutina/EditarEjercicioRutina'
 import IniciarEntreno from '../components/entreno/IniciarEntreno'
+import ModalBuscarEjercicio from '../components/rutina/ModalBuscarEjercicio'
 
 export default function DetalleRutina() {
   const { id } = useParams()
@@ -14,9 +15,17 @@ export default function DetalleRutina() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [eliminando, setEliminando] = useState(false)
+  const [duplicando, setDuplicando] = useState(false)
   const [mostrarConfirmar, setMostrarConfirmar] = useState(false)
+  const [ultimaSesion, setUltimaSesion] = useState(null)
+  const [sesionesRutina, setSesionesRutina] = useState([])
   const [ejercicioEditando, setEjercicioEditando] = useState(null)
   const [mostrarIniciar, setMostrarIniciar] = useState(false)
+  const [mostrarAnadirEjercicio, setMostrarAnadirEjercicio] = useState(false)
+  const [editando, setEditando] = useState(false)
+  const [nombreEdit, setNombreEdit] = useState('')
+  const [objetivoEdit, setObjetivoEdit] = useState('')
+  const [guardandoEdit, setGuardandoEdit] = useState(false)
 
   useEffect(() => {
     api.get(`/routines/${id}`)
@@ -34,7 +43,37 @@ export default function DetalleRutina() {
       .finally(() => setCargando(false))
   }, [id])
 
+  useEffect(() => {
+    api.get(`/training-sessions/routine/${id}`)
+      .then(r => {
+        const data = r.data ?? []
+        setSesionesRutina(data)
+        const completada = data.find(s => s.status === 'COMPLETED')
+        if (completada) setUltimaSesion(completada.startedAt)
+      })
+      .catch(() => {})
+  }, [id])
+
   const sortedBy = (list) => [...list].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+  const formatUltimaSesion = (iso) => {
+    const dias = Math.floor((Date.now() - new Date(iso)) / 86400000)
+    if (dias === 0) return 'hoy'
+    if (dias === 1) return 'hace 1 día'
+    if (dias < 30)  return `hace ${dias} días`
+    return new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+  }
+
+  const handleDuplicar = async () => {
+    setDuplicando(true)
+    try {
+      const { data } = await api.post(`/routines/${id}/duplicate`)
+      navigate(`/rutina/${data.id}`)
+    } catch {
+      setError('Error al duplicar la rutina')
+      setDuplicando(false)
+    }
+  }
 
   const eliminarRutina = async () => {
     setEliminando(true)
@@ -59,6 +98,34 @@ export default function DetalleRutina() {
     } catch (err) {
       setError(err.isForbidden ? 'No tienes permiso' : 'Error al eliminar el ejercicio')
     }
+  }
+
+  const handleEditarRutina = () => {
+    setNombreEdit(rutina.name)
+    setObjetivoEdit(rutina.goal ?? '')
+    setEditando(true)
+  }
+
+  const handleGuardarRutina = async () => {
+    if (!nombreEdit.trim()) return
+    setGuardandoEdit(true)
+    try {
+      const { data } = await api.patch(`/routines/${id}`, {
+        name: nombreEdit.trim(),
+        goal: objetivoEdit.trim() || null,
+      })
+      setRutina(data)
+      setEditando(false)
+    } catch {
+      setError('Error al guardar los cambios')
+    } finally {
+      setGuardandoEdit(false)
+    }
+  }
+
+  const handleEjercicioAnadido = (routineExercise) => {
+    setEjercicios(prev => [...prev, routineExercise])
+    setMostrarAnadirEjercicio(false)
   }
 
   const handleGuardarEdicion = (updatedRe) => {
@@ -91,6 +158,19 @@ export default function DetalleRutina() {
 
   const totalSeries = ejercicios.reduce((acc, re) => acc + (re.sets ?? 0), 0)
   const totalReps   = ejercicios.reduce((acc, re) => acc + (re.sets ?? 0) * (re.reps ?? 0), 0)
+
+  const sesCompletas    = sesionesRutina.filter(s => s.status === 'COMPLETED')
+  const vecesCompletada = sesCompletas.length
+  const tiempoTotalMin  = sesCompletas.reduce((acc, s) => acc + (s.durationMinutes ?? 0), 0)
+  const avgMin          = vecesCompletada > 0 ? Math.round(tiempoTotalMin / vecesCompletada) : 0
+  const th = Math.floor(tiempoTotalMin / 60)
+  const tm = tiempoTotalMin % 60
+  const tiempoTotalLabel = (() => {
+    if (tiempoTotalMin === 0) return '—'
+    if (tiempoTotalMin < 60) return `${tiempoTotalMin}m`
+    if (tm > 0) return `${th}h ${tm}m`
+    return `${th}h`
+  })()
 
   if (cargando) return (
     <div className="min-h-screen bg-[#0D0D0D] flex items-center justify-center">
@@ -136,11 +216,59 @@ export default function DetalleRutina() {
           >
             ← Mis rutinas
           </button>
-          <h1 className="font-['Oswald'] text-5xl md:text-6xl font-bold uppercase mb-4">
-            {rutina?.name}
-          </h1>
-          {rutina?.goal && (
-            <p className="text-white/50 text-lg max-w-2xl leading-relaxed">{rutina.goal}</p>
+
+          {editando ? (
+            <div className="flex flex-col gap-4">
+              <input
+                autoFocus
+                value={nombreEdit}
+                onChange={e => setNombreEdit(e.target.value)}
+                placeholder="Nombre de la rutina"
+                className="bg-transparent border-b-2 border-[#E63946] font-['Oswald'] text-4xl md:text-5xl font-bold uppercase text-white outline-none pb-1 w-full"
+              />
+              <input
+                value={objetivoEdit}
+                onChange={e => setObjetivoEdit(e.target.value)}
+                placeholder="Objetivo (opcional)"
+                className="bg-transparent border-b border-white/20 text-white/60 text-base outline-none pb-1 w-full focus:border-white/40 transition-colors"
+              />
+              <div className="flex gap-3 mt-2">
+                <button
+                  onClick={handleGuardarRutina}
+                  disabled={guardandoEdit || !nombreEdit.trim()}
+                  className="bg-[#E63946] text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-[#C1121F] transition-colors disabled:opacity-50"
+                >
+                  {guardandoEdit ? 'Guardando...' : 'Guardar'}
+                </button>
+                <button
+                  onClick={() => setEditando(false)}
+                  className="border border-white/20 text-white/50 px-5 py-2 rounded-lg text-sm hover:text-white transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="group relative">
+              <h1 className="font-['Oswald'] text-5xl md:text-6xl font-bold uppercase mb-4">
+                {rutina?.name}
+              </h1>
+              {rutina?.goal && (
+                <p className="text-white/50 text-lg max-w-2xl leading-relaxed">{rutina.goal}</p>
+              )}
+              <button
+                onClick={handleEditarRutina}
+                className="mt-4 text-white/30 text-sm hover:text-white/70 transition-colors flex items-center gap-1.5"
+              >
+                ✎ Editar nombre y objetivo
+              </button>
+            </div>
+          )}
+
+          {ultimaSesion && !editando && (
+            <p className="text-white/30 text-sm mt-3">
+              Última sesión: <span className="text-white/55">{formatUltimaSesion(ultimaSesion)}</span>
+            </p>
           )}
         </div>
 
@@ -158,6 +286,30 @@ export default function DetalleRutina() {
           ))}
         </div>
 
+        {/* Stats historial de la rutina */}
+        {vecesCompletada > 0 && (
+          <>
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-[10px] font-['JetBrains_Mono',monospace] uppercase tracking-[2px] text-white/30">
+                Historial de esta rutina
+              </span>
+              <div className="flex-1 h-px bg-white/5" />
+            </div>
+            <div className="grid grid-cols-3 gap-4 mb-10">
+              {[
+                { valor: vecesCompletada,  etiqueta: 'Veces completada' },
+                { valor: tiempoTotalLabel, etiqueta: 'Tiempo total'      },
+                { valor: `${avgMin}m`,     etiqueta: 'Duración media'    },
+              ].map(stat => (
+                <div key={stat.etiqueta} className="bg-[#1A1A1A] rounded-2xl p-6 text-center border border-white/5">
+                  <p className="font-['Oswald'] text-4xl font-bold mb-1" style={{ color: '#4ECDC4' }}>{stat.valor}</p>
+                  <p className="text-white/40 text-sm">{stat.etiqueta}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
         {/* Error inline */}
         {error && rutina && (
           <div className="bg-[#E63946]/15 border border-[#E63946]/40 rounded-lg px-4 py-3 text-[#E63946] text-sm mb-6">
@@ -167,7 +319,15 @@ export default function DetalleRutina() {
 
         {/* Lista ejercicios */}
         <div className="mb-10">
-          <h2 className="font-['Oswald'] text-2xl font-bold uppercase mb-6">Ejercicios</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="font-['Oswald'] text-2xl font-bold uppercase">Ejercicios</h2>
+            <button
+              onClick={() => setMostrarAnadirEjercicio(true)}
+              className="border border-white/20 text-white/60 px-4 py-2 rounded-lg text-sm font-semibold hover:text-white hover:border-white/40 transition-colors"
+            >
+              + Añadir
+            </button>
+          </div>
           <div className="flex flex-col gap-4">
             {ejercicios.map((re, index) => (
               <ItemEjercicioRutina
@@ -198,6 +358,13 @@ export default function DetalleRutina() {
               className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors"
             >
               + Nueva rutina
+            </button>
+            <button
+              onClick={handleDuplicar}
+              disabled={duplicando}
+              className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors disabled:opacity-50"
+            >
+              {duplicando ? 'Duplicando...' : '⎘ Duplicar rutina'}
             </button>
             <ExportRoutinePDF rutina={rutina} />
             <button
@@ -254,6 +421,15 @@ export default function DetalleRutina() {
           routineId={Number.parseInt(id, 10)}
           routineName={rutina?.name}
           onCancel={() => setMostrarIniciar(false)}
+        />
+      )}
+
+      {/* MODAL AÑADIR EJERCICIO */}
+      {mostrarAnadirEjercicio && (
+        <ModalBuscarEjercicio
+          rutinaId={id}
+          onAnadido={handleEjercicioAnadido}
+          onCerrar={() => setMostrarAnadirEjercicio(false)}
         />
       )}
     </div>

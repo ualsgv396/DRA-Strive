@@ -1,5 +1,6 @@
 package com.strive.backend.service;
 
+import com.strive.backend.domain.Difficulty;
 import com.strive.backend.domain.Exercise;
 import com.strive.backend.domain.ExerciseType;
 import com.strive.backend.dto.CreateExerciseRequest;
@@ -133,12 +134,31 @@ public class ExerciseService {
         exercise.setType(mapExerciseType(dto.getBodyPart(), dto.getTarget()));
         exercise.setDescription(buildDescription(dto));
         exercise.setMuscleGroups(buildMuscleGroups(dto.getBodyPart(), dto.getTarget()));
+        exercise.setDifficulty(inferirDificultad(dto.getName(), dto.getEquipment()));
         return exercise;
     }
 
     private String buildDescription(ExternalExerciseDto dto) {
-        return String.format("Grupo: %s | Músculo objetivo: %s | Equipamiento: %s",
-                dto.getBodyPart(), dto.getTarget(), dto.getEquipment());
+        List<String> muscles = buildMuscleGroups(dto.getBodyPart(), dto.getTarget());
+        String fallback = dto.getBodyPart() != null ? dto.getBodyPart() : "general";
+        String muscStr  = muscles.isEmpty() ? fallback : String.join(", ", muscles);
+        String equipo  = dto.getEquipment() != null && !dto.getEquipment().isBlank() ? dto.getEquipment() : "peso corporal";
+        String parte   = dto.getBodyPart() != null ? dto.getBodyPart().toLowerCase() : "general";
+        return String.format("Ejercicio de %s que trabaja principalmente %s. Se realiza con %s.", parte, muscStr, equipo);
+    }
+
+    private Difficulty inferirDificultad(String nombre, String equipo) {
+        if (nombre == null) return Difficulty.PRINCIPIANTE;
+        String n = nombre.toLowerCase();
+        if (n.matches(".*(clean|snatch|jerk|muscle.up|planche|handstand|turkish|thruster).*")) {
+            return Difficulty.AVANZADO;
+        }
+        boolean esPesoCorporal = equipo == null
+            || equipo.isBlank()
+            || equipo.toLowerCase().contains("peso corporal")
+            || equipo.toLowerCase().contains("bodyweight")
+            || equipo.toLowerCase().contains("ninguno");
+        return esPesoCorporal ? Difficulty.PRINCIPIANTE : Difficulty.INTERMEDIO;
     }
 
     private ExerciseType mapExerciseType(String bodyPart, String target) {

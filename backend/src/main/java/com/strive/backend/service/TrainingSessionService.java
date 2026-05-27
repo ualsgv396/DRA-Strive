@@ -97,11 +97,10 @@ public class TrainingSessionService {
 
     @Transactional
     public void abandonSession(Long sessionId) {
-        TrainingSession session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
-        session.setStatus(TrainingSessionStatus.ABANDONED);
-        session.setCompletedAt(LocalDateTime.now());
-        sessionRepository.save(session);
+        if (!sessionRepository.existsById(sessionId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found");
+        }
+        sessionRepository.deleteById(sessionId);
     }
 
     @Transactional(readOnly = true)
@@ -119,6 +118,13 @@ public class TrainingSessionService {
                 .stream()
                 .map(this::toDto)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public TrainingSessionResponseDto getById(Long id) {
+        return sessionRepository.findById(id)
+                .map(this::toDto)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
     }
 
     @Transactional(readOnly = true)

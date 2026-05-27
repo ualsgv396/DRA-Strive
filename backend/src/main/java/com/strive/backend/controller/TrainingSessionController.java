@@ -52,6 +52,12 @@ public class TrainingSessionController {
         return trainingSessionService.completeSession(id, request);
     }
 
+    @GetMapping("/{id}")
+    public TrainingSessionResponseDto getById(@PathVariable Long id) {
+        requireOwnership(id);
+        return trainingSessionService.getById(id);
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void abandon(@PathVariable Long id) {

@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import api from '../api/axios'
+import { useChat } from '../hooks/useChat'
+import VentanaChat from '../components/chat/VentanaChat'
 
 export default function Amigos() {
   const location = useLocation()
+  const chat     = useChat()
+
   const [busqueda, setBusqueda] = useState('')
   const [amigos, setAmigos] = useState([])
   const [solicitudes, setSolicitudes] = useState([])
@@ -215,7 +219,16 @@ export default function Amigos() {
                   <p style={estilos.nombre}>{amigo.fullName}</p>
                   <p style={estilos.nickname}>@{amigo.nickname}</p>
                 </div>
-                <span style={{ ...estilos.estado, ...estilos.enLinea }}>Amigo</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ ...estilos.estado, ...estilos.enLinea }}>Amigo</span>
+                  <button
+                    style={estilos.botonChat}
+                    onClick={() => chat.abrirConversacion(amigo.id)}
+                    aria-label={`Chatear con ${amigo.fullName}`}
+                  >
+                    💬
+                  </button>
+                </div>
               </div>
             ))}
             {amigos.length === 0 && <p style={estilos.textoSuave}>Aun no tienes amigos agregados.</p>}
@@ -224,6 +237,15 @@ export default function Amigos() {
         {procesandoInvitacion && <p style={estilos.textoSuave}>Procesando invitacion...</p>}
         {mensaje && <p style={estilos.mensaje}>{mensaje}</p>}
       </main>
+
+      {/* Overlay de chat: se renderiza encima cuando hay conversación activa */}
+      <VentanaChat
+        conversacionActiva={chat.conversacionActiva}
+        mensajes={chat.mensajes}
+        cargandoMensajes={chat.cargandoMensajes}
+        onCerrar={chat.cerrarConversacion}
+        onEnviar={chat.enviarMensaje}
+      />
     </div>
   )
 }
@@ -409,5 +431,15 @@ const estilos = {
     marginTop: '12px',
     color: '#E63946',
     fontSize: '13px'
+  },
+  botonChat: {
+    border:          'none',
+    background:      'rgba(230,57,70,0.12)',
+    borderRadius:    '10px',
+    padding:         '6px 10px',
+    fontSize:        '16px',
+    cursor:          'pointer',
+    lineHeight:      1,
+    transition:      'background 0.15s',
   }
 }

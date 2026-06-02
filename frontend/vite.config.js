@@ -11,4 +11,7 @@ export default defineConfig({
     // sockjs-client es CommonJS; Vite necesita pre-bundlearlo para ESM
     include: ['sockjs-client', '@stomp/stompjs'],
   },
+  define: {
+  global: 'window',
+},
 })

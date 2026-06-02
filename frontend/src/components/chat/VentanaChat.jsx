@@ -1,15 +1,36 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import api from '../../api/axios'
 import { useAuth } from '../../context/ContextoAuth'
 
 // ── Burbuja de mensaje ────────────────────────────────────────────────────────
 
 function BurbujaMensaje({ mensaje, esMio }) {
   const navigate = useNavigate()
+  const [guardando,  setGuardando]  = useState(false)
+  const [guardado,   setGuardado]   = useState(false)
+  const [errorGuardar, setErrorGuardar] = useState('')
 
   const hora = new Date(mensaje.sentAt).toLocaleTimeString('es-ES', {
     hour: '2-digit', minute: '2-digit',
   })
+
+  const handleAnadirAMisRutinas = async () => {
+    if (guardando || guardado) return
+    setErrorGuardar('')
+    setGuardando(true)
+    try {
+      const { data } = await api.post(`/routines/${mensaje.routineId}/save-from-chat`)
+      setGuardado(true)
+      // Navegamos al nuevo clon para que el usuario lo vea/edite.
+      // Pequeño delay para que se vea la confirmación.
+      setTimeout(() => navigate(`/rutina/${data.id}`), 700)
+    } catch (err) {
+      setErrorGuardar(err.response?.data?.message
+        ?? 'No se pudo añadir a tus rutinas')
+      setGuardando(false)
+    }
+  }
 
   if (mensaje.type === 'ROUTINE') {
     return (
@@ -23,12 +44,31 @@ function BurbujaMensaje({ mensaje, esMio }) {
             <p style={s.routineNota}>{mensaje.content}</p>
           )}
           {mensaje.routineId && (
-            <button
-              onClick={() => navigate(`/rutina/${mensaje.routineId}`)}
-              style={s.routineBtn}
-            >
-              Ver rutina →
-            </button>
+            <div style={s.routineAcciones}>
+              <button
+                onClick={() => navigate(`/rutina/${mensaje.routineId}`)}
+                style={s.routineBtn}
+              >
+                Ver detalles →
+              </button>
+              {/* "Añadir a mis rutinas" sólo tiene sentido para el receptor.
+                  Si soy yo quien la envió, ya está en mi panel. */}
+              {!esMio && !guardado && (
+                <button
+                  onClick={handleAnadirAMisRutinas}
+                  disabled={guardando}
+                  style={{ ...s.routineBtn, ...s.routineBtnAdd }}
+                >
+                  {guardando ? 'Añadiendo…' : '+ Añadir a mis rutinas'}
+                </button>
+              )}
+              {guardado && (
+                <span style={s.routineAdded}>✓ Añadida — abriendo…</span>
+              )}
+            </div>
+          )}
+          {errorGuardar && (
+            <p style={s.routineError}>{errorGuardar}</p>
           )}
           <span style={s.hora}>{hora}</span>
         </div>
@@ -365,6 +405,13 @@ const s = {
     color:      'rgba(255,255,255,0.6)',
     margin:     0,
   },
+  routineAcciones: {
+    display:        'flex',
+    flexDirection:  'column',
+    gap:            '6px',
+    marginTop:      '6px',
+    alignItems:     'flex-start',
+  },
   routineBtn: {
     background:    'none',
     border:        'none',
@@ -375,7 +422,24 @@ const s = {
     cursor:        'pointer',
     padding:       0,
     textAlign:     'left',
-    marginTop:     '4px',
+  },
+  routineBtnAdd: {
+    border:        `1px solid ${RED}`,
+    borderRadius:  '8px',
+    padding:       '6px 10px',
+    background:    'rgba(230,57,70,0.12)',
+  },
+  routineAdded: {
+    fontFamily: "'Inter', sans-serif",
+    fontSize:   '12px',
+    color:      '#4ECDC4',
+    fontWeight: 600,
+  },
+  routineError: {
+    fontFamily: "'Inter', sans-serif",
+    fontSize:   '12px',
+    color:      RED,
+    margin:     '4px 0 0',
   },
 
   // Input

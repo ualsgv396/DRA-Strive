@@ -12,6 +12,7 @@ import com.strive.backend.dto.RoutineExerciseRequest;
 import com.strive.backend.dto.UpdateRoutineExerciseRequest;
 import java.time.LocalDateTime;
 import com.strive.backend.repository.ExerciseRepository;
+import com.strive.backend.repository.MessageRepository;
 import com.strive.backend.repository.RoutineExerciseRepository;
 import com.strive.backend.repository.RoutineRepository;
 import com.strive.backend.repository.TrainingSessionRepository;
@@ -32,19 +33,22 @@ public class RoutineService {
     private final ExerciseRepository exerciseRepository;
     private final RoutineExerciseRepository routineExerciseRepository;
     private final TrainingSessionRepository trainingSessionRepository;
+    private final MessageRepository messageRepository;
 
     public RoutineService(
             RoutineRepository routineRepository,
             UserRepository userRepository,
             ExerciseRepository exerciseRepository,
             RoutineExerciseRepository routineExerciseRepository,
-            TrainingSessionRepository trainingSessionRepository
+            TrainingSessionRepository trainingSessionRepository,
+            MessageRepository messageRepository
     ) {
         this.routineRepository = routineRepository;
         this.userRepository = userRepository;
         this.exerciseRepository = exerciseRepository;
         this.routineExerciseRepository = routineExerciseRepository;
         this.trainingSessionRepository = trainingSessionRepository;
+        this.messageRepository = messageRepository;
     }
 
     public List<Routine> findByOwner(Long ownerId) {
@@ -248,5 +252,41 @@ public class RoutineService {
 
     private String defaultLoadUnit(Exercise exercise) {
         return exercise.getType() == ExerciseType.CARDIO ? "SECONDS" : "KG";
+    }
+
+    /**
+     * Devuelve una rutina si el usuario actual está autorizado a verla por
+     * haberla recibido (o enviado) a través del chat — o si es su propio dueño.
+     * No expone rutinas arbitrarias: el receptor de un mensaje tipo ROUTINE
+     * gana acceso de lectura sólo a la rutina exacta que se compartió.
+     */
+    public Routine findSharedWithUser(Long routineId, Long userId) {
+        Routine routine = routineRepository.findById(routineId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Routine not found"));
+
+        boolean esOwner    = routine.getOwnerId() != null && routine.getOwnerId().equals(userId);
+        boolean recibidaEnChat = messageRepository.existsRoutineSharedWithUser(routineId, userId);
+
+        if (!esOwner && !recibidaEnChat) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Routine not shared with user");
+        }
+        return routine;
+    }
+
+    /**
+     * Clona una rutina recibida por chat al panel del usuario actual.
+     * Sólo se permite si existe al menos un mensaje tipo ROUTINE con esa
+     * routineId en una conversación en la que participa el usuario —
+     * evitando que un cliente malicioso clone rutinas ajenas arbitrarias.
+     */
+    @Transactional
+    public Routine saveSharedRoutineToMyAccount(Long sourceRoutineId, Long currentUserId) {
+        if (!messageRepository.existsRoutineSharedWithUser(sourceRoutineId, currentUserId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "Esta rutina no se ha compartido contigo");
+        }
+        // Reutilizamos la lógica de duplicar — copia ejercicios y carga.
+        return duplicateRoutine(sourceRoutineId, currentUserId);
     }
 }

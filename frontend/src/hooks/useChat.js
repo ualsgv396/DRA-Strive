@@ -165,6 +165,38 @@ export function useChat() {
     })
   }, [clientRef])
 
+  /**
+   * Comparte una rutina con un amigo SIN necesidad de abrir antes la ventana
+   * de chat. Resuelve (o crea) la conversación con ese amigo y publica el
+   * mensaje STOMP usando directamente el id devuelto por la API — evita la
+   * carrera entre `setConversacionActiva` (asíncrono) y el ref que lee
+   * `enviarMensaje`.
+   */
+  const compartirRutinaConAmigo = useCallback(async (
+    amigoId,
+    routineId,
+    routineName,
+    nota = '',
+  ) => {
+    if (!clientRef.current?.active) {
+      throw new Error('Sin conexión en tiempo real — vuelve a intentarlo en unos segundos')
+    }
+    const { data: conv } = await api.post(`/chat/conversations/${amigoId}`)
+    clientRef.current.publish({
+      destination: '/app/chat.send',
+      body: JSON.stringify({
+        conversationId:      conv.id,
+        content:             nota,
+        type:                'ROUTINE',
+        routineId,
+        routineNameSnapshot: routineName,
+      }),
+    })
+    // Refrescamos la lista de conversaciones para que aparezca arriba.
+    cargarConversaciones()
+    return conv
+  }, [clientRef, cargarConversaciones])
+
   return {
     conectado,
     conversaciones,
@@ -175,6 +207,7 @@ export function useChat() {
     abrirConversacion,
     cerrarConversacion,
     enviarMensaje,
+    compartirRutinaConAmigo,
     cargarConversaciones,
   }
 }

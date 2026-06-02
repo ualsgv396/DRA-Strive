@@ -6,6 +6,7 @@ import ItemEjercicioRutina from '../components/rutina/ItemEjercicioRutina'
 import EditarEjercicioRutina from '../components/rutina/EditarEjercicioRutina'
 import IniciarEntreno from '../components/entreno/IniciarEntreno'
 import ModalBuscarEjercicio from '../components/rutina/ModalBuscarEjercicio'
+import ModalCompartirRutina from '../components/chat/ModalCompartirRutina'
 
 export default function DetalleRutina() {
   const { id } = useParams()
@@ -26,21 +27,38 @@ export default function DetalleRutina() {
   const [nombreEdit, setNombreEdit] = useState('')
   const [objetivoEdit, setObjetivoEdit] = useState('')
   const [guardandoEdit, setGuardandoEdit] = useState(false)
+  const [mostrarCompartir, setMostrarCompartir] = useState(false)
+  // Modo "vista de rutina recibida por chat": sin permisos de edición.
+  const [esCompartida, setEsCompartida] = useState(false)
+  const [guardandoEnPanel, setGuardandoEnPanel] = useState(false)
 
   useEffect(() => {
+    let cancelado = false
+
+    const aplicar = (data, compartida) => {
+      if (cancelado) return
+      setRutina(data)
+      setEjercicios(sortedBy(data.routineExercises ?? []))
+      setEsCompartida(compartida)
+    }
+
     api.get(`/routines/${id}`)
-      .then(r => {
-        setRutina(r.data)
-        setEjercicios(sortedBy(r.data.routineExercises ?? []))
-      })
+      .then(r => aplicar(r.data, false))
       .catch(err => {
+        // Si no soy el dueño pero la rutina puede haberme llegado por chat,
+        // intentamos el endpoint de preview compartido (modo read-only).
         if (err.isForbidden) {
-          setError('No tienes permiso para ver esta rutina')
-        } else {
-          setError('No se pudo cargar la rutina')
+          return api.get(`/routines/${id}/shared-preview`)
+            .then(r => aplicar(r.data, true))
+            .catch(() => {
+              if (!cancelado) setError('No tienes permiso para ver esta rutina')
+            })
         }
+        if (!cancelado) setError('No se pudo cargar la rutina')
       })
-      .finally(() => setCargando(false))
+      .finally(() => { if (!cancelado) setCargando(false) })
+
+    return () => { cancelado = true }
   }, [id])
 
   useEffect(() => {
@@ -72,6 +90,19 @@ export default function DetalleRutina() {
     } catch {
       setError('Error al duplicar la rutina')
       setDuplicando(false)
+    }
+  }
+
+  const handleAnadirAMiPanel = async () => {
+    setGuardandoEnPanel(true)
+    try {
+      const { data } = await api.post(`/routines/${id}/save-from-chat`)
+      navigate(`/rutina/${data.id}`)
+    } catch (err) {
+      setError(err.isForbidden
+        ? 'Esta rutina ya no está disponible'
+        : 'No se pudo añadir a tus rutinas')
+      setGuardandoEnPanel(false)
     }
   }
 
@@ -198,12 +229,19 @@ export default function DetalleRutina() {
         >
           STRIVE
         </span>
-        <button
-          onClick={() => setMostrarConfirmar(true)}
-          className="border border-[#E63946]/40 text-[#E63946] px-4 py-2 rounded-lg text-sm hover:bg-[#E63946]/10 transition-colors"
-        >
-          Eliminar rutina
-        </button>
+        {!esCompartida && (
+          <button
+            onClick={() => setMostrarConfirmar(true)}
+            className="border border-[#E63946]/40 text-[#E63946] px-4 py-2 rounded-lg text-sm hover:bg-[#E63946]/10 transition-colors"
+          >
+            Eliminar rutina
+          </button>
+        )}
+        {esCompartida && (
+          <span className="text-[10px] font-['JetBrains_Mono',monospace] uppercase tracking-[2px] text-white/40 border border-white/15 rounded-full px-3 py-1">
+            Rutina compartida
+          </span>
+        )}
       </nav>
 
       <div className="max-w-4xl mx-auto px-6 md:px-10 pt-10 pb-28">
@@ -256,12 +294,14 @@ export default function DetalleRutina() {
               {rutina?.goal && (
                 <p className="text-white/50 text-lg max-w-2xl leading-relaxed">{rutina.goal}</p>
               )}
-              <button
-                onClick={handleEditarRutina}
-                className="mt-4 text-white/30 text-sm hover:text-white/70 transition-colors flex items-center gap-1.5"
-              >
-                ✎ Editar nombre y objetivo
-              </button>
+              {!esCompartida && (
+                <button
+                  onClick={handleEditarRutina}
+                  className="mt-4 text-white/30 text-sm hover:text-white/70 transition-colors flex items-center gap-1.5"
+                >
+                  ✎ Editar nombre y objetivo
+                </button>
+              )}
             </div>
           )}
 
@@ -321,12 +361,14 @@ export default function DetalleRutina() {
         <div className="mb-10">
           <div className="flex items-center justify-between mb-6">
             <h2 className="font-['Oswald'] text-2xl font-bold uppercase">Ejercicios</h2>
-            <button
-              onClick={() => setMostrarAnadirEjercicio(true)}
-              className="border border-white/20 text-white/60 px-4 py-2 rounded-lg text-sm font-semibold hover:text-white hover:border-white/40 transition-colors"
-            >
-              + Añadir
-            </button>
+            {!esCompartida && (
+              <button
+                onClick={() => setMostrarAnadirEjercicio(true)}
+                className="border border-white/20 text-white/60 px-4 py-2 rounded-lg text-sm font-semibold hover:text-white hover:border-white/40 transition-colors"
+              >
+                + Añadir
+              </button>
+            )}
           </div>
           <div className="flex flex-col gap-4">
             {ejercicios.map((re, index) => (
@@ -339,6 +381,7 @@ export default function DetalleRutina() {
                 onDelete={handleEliminarEjercicio}
                 onMoveUp={re => handleMover(re, -1)}
                 onMoveDown={re => handleMover(re, 1)}
+                readonly={esCompartida}
               />
             ))}
           </div>
@@ -346,34 +389,63 @@ export default function DetalleRutina() {
 
         {/* Acciones */}
         <div className="flex flex-col gap-4">
-          <button
-            onClick={() => setMostrarIniciar(true)}
-            className="w-full bg-[#E63946] text-white py-5 rounded-xl font-['Oswald'] font-bold text-xl uppercase tracking-wider hover:bg-[#C1121F] transition-colors"
-          >
-            ▶ Iniciar entrenamiento
-          </button>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <button
-              onClick={() => navigate('/rutina/nueva')}
-              className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors"
-            >
-              + Nueva rutina
-            </button>
-            <button
-              onClick={handleDuplicar}
-              disabled={duplicando}
-              className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors disabled:opacity-50"
-            >
-              {duplicando ? 'Duplicando...' : '⎘ Duplicar rutina'}
-            </button>
-            <ExportRoutinePDF rutina={rutina} />
-            <button
-              onClick={() => navigate('/ejercicios')}
-              className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors"
-            >
-              Ver ejercicios
-            </button>
-          </div>
+          {esCompartida ? (
+            <>
+              <button
+                onClick={handleAnadirAMiPanel}
+                disabled={guardandoEnPanel}
+                className="w-full bg-[#E63946] text-white py-5 rounded-xl font-['Oswald'] font-bold text-xl uppercase tracking-wider hover:bg-[#C1121F] transition-colors disabled:opacity-60"
+              >
+                {guardandoEnPanel ? 'Añadiendo…' : '+ Añadir a mis rutinas'}
+              </button>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <ExportRoutinePDF rutina={rutina} />
+                <button
+                  onClick={() => navigate('/ejercicios')}
+                  className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors"
+                >
+                  Ver ejercicios
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setMostrarIniciar(true)}
+                className="w-full bg-[#E63946] text-white py-5 rounded-xl font-['Oswald'] font-bold text-xl uppercase tracking-wider hover:bg-[#C1121F] transition-colors"
+              >
+                ▶ Iniciar entrenamiento
+              </button>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button
+                  onClick={() => navigate('/rutina/nueva')}
+                  className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors"
+                >
+                  + Nueva rutina
+                </button>
+                <button
+                  onClick={handleDuplicar}
+                  disabled={duplicando}
+                  className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors disabled:opacity-50"
+                >
+                  {duplicando ? 'Duplicando...' : '⎘ Duplicar rutina'}
+                </button>
+                <button
+                  onClick={() => setMostrarCompartir(true)}
+                  className="flex-1 border border-[#E63946]/40 text-[#E63946] py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:bg-[#E63946]/10 transition-colors"
+                >
+                  ⇪ Compartir
+                </button>
+                <ExportRoutinePDF rutina={rutina} />
+                <button
+                  onClick={() => navigate('/ejercicios')}
+                  className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors"
+                >
+                  Ver ejercicios
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -430,6 +502,14 @@ export default function DetalleRutina() {
           rutinaId={id}
           onAnadido={handleEjercicioAnadido}
           onCerrar={() => setMostrarAnadirEjercicio(false)}
+        />
+      )}
+
+      {/* MODAL COMPARTIR RUTINA */}
+      {mostrarCompartir && rutina && (
+        <ModalCompartirRutina
+          rutina={rutina}
+          onCerrar={() => setMostrarCompartir(false)}
         />
       )}
     </div>

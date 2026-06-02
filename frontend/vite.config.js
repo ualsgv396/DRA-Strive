@@ -7,6 +7,12 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  // sockjs-client referencia `global` (de Node) en el código que se ejecuta
+  // en el navegador. Sin este alias, en producción lanza
+  // "ReferenceError: global is not defined" y deja la app en blanco.
+  define: {
+    global: 'window',
+  },
   optimizeDeps: {
     // sockjs-client es CommonJS; Vite necesita pre-bundlearlo para ESM
     include: ['sockjs-client', '@stomp/stompjs'],

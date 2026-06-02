@@ -3,9 +3,13 @@ WORKDIR /app
 
 COPY package*.json ./
 
-# Forzamos el espejo alternativo que sí te respondía los segundos
-RUN npm config set registry https://registry.npmmirror.com && \
-    npm install --no-audit --no-fund --loglevel=error
+# Intentamos primero el registry oficial de npm (que tiene todos los paquetes,
+# incluidos los del scope @stomp). Si falla por red, caemos al espejo
+# npmmirror como red de seguridad.
+RUN npm install --no-audit --no-fund --loglevel=error \
+ || (echo "npm registry oficial falló, probando npmmirror..." \
+     && npm config set registry https://registry.npmmirror.com \
+     && npm install --no-audit --no-fund --loglevel=error)
 
 COPY . .
 

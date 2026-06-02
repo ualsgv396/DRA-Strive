@@ -45,6 +45,17 @@ const getAvatarColor = str => {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
+// ── Info Row ──────────────────────────────────────────────────────────────────
+
+function InfoRow({ label, value }) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-2.5 border-b border-white/[0.04] last:border-0">
+      <span className="text-white/30 text-[11px] uppercase tracking-wider flex-shrink-0">{label}</span>
+      <span className="text-white/65 text-xs text-right leading-relaxed">{value || '—'}</span>
+    </div>
+  )
+}
+
 // ── Status Badge ───────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG = {
@@ -151,6 +162,8 @@ const ESTADO_MAP = {
 }
 
 export default function GestionUsuarios() {
+  const esAdminTarget = (u) => u.role === 'ADMIN'
+
   const [usuarios,       setUsuarios]       = useState([])
   const [stats,          setStats]          = useState(null)
   const [cargando,       setCargando]       = useState(true)
@@ -165,6 +178,14 @@ export default function GestionUsuarios() {
   const [seleccionados,  setSeleccionados]  = useState(new Set())
   const [modalUsuario,   setModalUsuario]   = useState(null)
   const [suspendiendo,   setSuspendiendo]   = useState(false)
+  const [modalEliminar,  setModalEliminar]  = useState(null)
+  const [eliminandoUser, setEliminandoUser] = useState(false)
+  const [errorEliminar,  setErrorEliminar]  = useState('')
+  const [modalEditar,    setModalEditar]    = useState(null)
+  const [rolEditar,      setRolEditar]      = useState('')
+  const [guardandoRol,   setGuardandoRol]   = useState(false)
+  const [errorEditar,    setErrorEditar]    = useState('')
+  const [panelPerfil,    setPanelPerfil]    = useState(null)
   const [busquedaDebounce, setBusquedaDebounce] = useState('')
 
   // Debounce búsqueda
@@ -227,6 +248,38 @@ export default function GestionUsuarios() {
     }
   }
 
+  const handleEliminar = async () => {
+    if (!modalEliminar) return
+    setEliminandoUser(true)
+    setErrorEliminar('')
+    try {
+      await api.delete(`/admin/users/${modalEliminar.id}`)
+      setModalEliminar(null)
+      await cargarUsuarios()
+      api.get('/admin/users/stats').then(r => setStats(r.data)).catch(() => {})
+    } catch (e) {
+      setErrorEliminar(e.response?.data?.message || 'Error al eliminar el usuario')
+    } finally {
+      setEliminandoUser(false)
+    }
+  }
+
+  const handleCambiarRol = async () => {
+    if (!modalEditar || rolEditar === modalEditar.role) return
+    setGuardandoRol(true)
+    setErrorEditar('')
+    try {
+      await api.patch(`/admin/users/${modalEditar.id}/role`, { role: rolEditar })
+      setModalEditar(null)
+      await cargarUsuarios()
+      api.get('/admin/users/stats').then(r => setStats(r.data)).catch(() => {})
+    } catch (e) {
+      setErrorEditar(e.response?.data?.message || 'Error al cambiar el rol')
+    } finally {
+      setGuardandoRol(false)
+    }
+  }
+
   const handleActivar = async (usuario) => {
     try {
       await api.patch(`/admin/users/${usuario.id}/activate`)
@@ -259,6 +312,38 @@ export default function GestionUsuarios() {
 
   const inicio = pagina * tamano + 1
   const fin    = Math.min((pagina + 1) * tamano, totalElements)
+
+  const exportarCSVUsuarios = () => {
+    if (!usuarios.length) return
+    const cols = [
+      'Nombre', 'Email', 'Nickname', 'Rol', 'Estado',
+      'Rutinas', 'Sesiones', 'Última actividad', 'Registrado',
+      'Suspendido', 'Motivo suspensión',
+    ]
+    const filas = usuarios.map(u => [
+      u.fullName ?? '',
+      u.email ?? '',
+      u.nickname ?? '',
+      u.role ?? '',
+      u.status ?? '',
+      u.rutinasCount ?? 0,
+      u.sesionesCount ?? 0,
+      u.lastSeenAt  ? new Date(u.lastSeenAt).toLocaleString('es-ES')   : '',
+      u.createdAt   ? new Date(u.createdAt).toLocaleDateString('es-ES') : '',
+      u.suspended ? 'Sí' : 'No',
+      u.suspendedReason ?? '',
+    ])
+    const csv = [cols, ...filas]
+      .map(fila => fila.map(v => `"${String(v).replaceAll('"', '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `strive-usuarios-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const paginasVisibles = () => {
     const ps = []
@@ -296,9 +381,10 @@ export default function GestionUsuarios() {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button type="button"
-            onClick={() => {/* exportar CSV */}}
-            className="px-4 py-2 rounded-lg bg-white/[0.07] text-white/55 text-sm font-medium hover:bg-white/[0.12] transition-all border border-white/[0.08]">
-            Exportar
+            onClick={exportarCSVUsuarios}
+            disabled={cargando || !usuarios.length}
+            className="px-4 py-2 rounded-lg bg-white/[0.07] text-white/55 text-sm font-medium hover:bg-white/[0.12] transition-all border border-white/[0.08] disabled:opacity-40 disabled:cursor-not-allowed">
+            Exportar CSV
           </button>
           <button type="button"
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#E63946] hover:bg-[#c8303c] text-white text-sm font-bold transition-all shadow-lg shadow-[#E63946]/20">
@@ -458,26 +544,39 @@ export default function GestionUsuarios() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
                           <button type="button" title="Ver perfil"
+                            onClick={() => setPanelPerfil(u)}
                             className="w-7 h-7 flex items-center justify-center rounded-lg text-white/25 hover:text-white/70 hover:bg-white/[0.07] transition-all">
                             <IconEye />
                           </button>
-                          <button type="button" title="Editar"
-                            className="w-7 h-7 flex items-center justify-center rounded-lg text-white/25 hover:text-white/70 hover:bg-white/[0.07] transition-all">
+                          <button type="button"
+                            title={esAdminTarget(u) ? 'No disponible para administradores' : 'Cambiar rol'}
+                            disabled={esAdminTarget(u)}
+                            onClick={() => { setModalEditar(u); setRolEditar(u.role); setErrorEditar('') }}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-white/25 hover:text-white/70 hover:bg-white/[0.07] transition-all disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                             <IconEdit />
                           </button>
                           {u.suspended ? (
-                            <button type="button" title="Reactivar usuario" onClick={() => handleActivar(u)}
-                              className="w-7 h-7 flex items-center justify-center rounded-lg text-[#00C9A7]/50 hover:text-[#00C9A7] hover:bg-[#00C9A7]/10 transition-all">
+                            <button type="button"
+                              title={esAdminTarget(u) ? 'No disponible para administradores' : 'Reactivar usuario'}
+                              disabled={esAdminTarget(u)}
+                              onClick={() => handleActivar(u)}
+                              className="w-7 h-7 flex items-center justify-center rounded-lg text-[#00C9A7]/50 hover:text-[#00C9A7] hover:bg-[#00C9A7]/10 transition-all disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                               <IconPlay />
                             </button>
                           ) : (
-                            <button type="button" title="Suspender usuario" onClick={() => setModalUsuario(u)}
-                              className="w-7 h-7 flex items-center justify-center rounded-lg text-white/25 hover:text-orange-400 hover:bg-orange-500/10 transition-all">
+                            <button type="button"
+                              title={esAdminTarget(u) ? 'No disponible para administradores' : 'Suspender usuario'}
+                              disabled={esAdminTarget(u)}
+                              onClick={() => setModalUsuario(u)}
+                              className="w-7 h-7 flex items-center justify-center rounded-lg text-white/25 hover:text-orange-400 hover:bg-orange-500/10 transition-all disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                               <IconPause />
                             </button>
                           )}
-                          <button type="button" title="Eliminar"
-                            className="w-7 h-7 flex items-center justify-center rounded-lg text-white/25 hover:text-[#E63946] hover:bg-[#E63946]/10 transition-all">
+                          <button type="button"
+                            title={esAdminTarget(u) ? 'No disponible para administradores' : 'Eliminar usuario'}
+                            disabled={esAdminTarget(u)}
+                            onClick={() => { setModalEliminar(u); setErrorEliminar('') }}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-white/25 hover:text-[#E63946] hover:bg-[#E63946]/10 transition-all disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                             <IconTrash />
                           </button>
                         </div>
@@ -550,6 +649,308 @@ export default function GestionUsuarios() {
           cargando={suspendiendo}
         />
       )}
+
+      {/* Modal eliminar usuario */}
+      {modalEliminar && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+          <div
+            className="bg-[#161616] rounded-2xl w-full max-w-sm border border-[#E63946]/25 overflow-hidden"
+            style={{ boxShadow: '0 0 40px rgba(230,57,70,0.12), 0 25px 60px rgba(0,0,0,0.6)' }}
+          >
+            <div className="p-7">
+              <div
+                className="w-12 h-12 rounded-xl bg-[#E63946]/15 border border-[#E63946]/30 flex items-center justify-center mb-5 text-[#E63946]"
+                style={{ boxShadow: '0 0 16px rgba(230,57,70,0.2)' }}
+              >
+                <IconTrash />
+              </div>
+
+              <h3 className="font-['Oswald'] text-2xl font-bold uppercase mb-2 tracking-wide">
+                ¿Eliminar usuario?
+              </h3>
+              <p className="text-white/55 text-sm leading-relaxed mb-1">
+                Se eliminará permanentemente la cuenta de{' '}
+                <span className="text-white font-semibold">{modalEliminar.fullName}</span>.
+              </p>
+              <p className="text-white/30 text-xs mb-5">{modalEliminar.email}</p>
+
+              <ul className="flex flex-col gap-2 mb-5">
+                {[
+                  'Se perderán todas sus rutinas y sesiones de entrenamiento',
+                  'Esta acción no se puede deshacer',
+                ].map(item => (
+                  <li key={item} className="flex items-start gap-2 text-sm text-white/40">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#E63946] mt-1.5 flex-shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+
+              {errorEliminar && (
+                <div className="bg-[#E63946]/10 border border-[#E63946]/30 rounded-lg px-4 py-3 text-[#E63946] text-sm mb-2">
+                  {errorEliminar}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 px-7 py-5 border-t border-white/[0.06] bg-[#111111]">
+              <button
+                type="button"
+                onClick={() => { setModalEliminar(null); setErrorEliminar('') }}
+                className="flex-1 bg-[#1E1E1E] border border-white/10 text-white/65 py-3 rounded-xl text-sm font-semibold hover:text-white hover:border-white/20 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleEliminar}
+                disabled={eliminandoUser}
+                className="flex-1 bg-[#E63946] hover:bg-[#c8303c] text-white py-3 rounded-xl font-['Oswald'] font-bold uppercase tracking-wider text-sm transition-colors disabled:opacity-60"
+              >
+                {eliminandoUser ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal cambiar rol */}
+      {modalEditar && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+          <div
+            className="bg-[#161616] rounded-2xl w-full max-w-sm border border-white/[0.08] overflow-hidden"
+            style={{ boxShadow: '0 25px 60px rgba(0,0,0,0.6)' }}
+          >
+            <div className="p-7">
+              <p className="text-white/25 text-[10px] font-bold uppercase tracking-[0.2em] mb-5">
+                Editar usuario
+              </p>
+
+              {/* Info usuario */}
+              <div className="flex items-center gap-3 mb-6 pb-6 border-b border-white/[0.06]">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
+                  style={{
+                    backgroundColor: `${getAvatarColor(modalEditar.fullName || modalEditar.email)}33`,
+                    border: `1.5px solid ${getAvatarColor(modalEditar.fullName || modalEditar.email)}55`,
+                    color: getAvatarColor(modalEditar.fullName || modalEditar.email),
+                  }}
+                >
+                  {(modalEditar.fullName || modalEditar.email || '?')[0].toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-white font-semibold text-sm truncate">{modalEditar.fullName}</p>
+                  <p className="text-white/30 text-xs truncate">{modalEditar.email}</p>
+                </div>
+              </div>
+
+              {/* Selector de rol */}
+              <p className="text-white/25 text-[10px] font-bold uppercase tracking-widest mb-3">Rol</p>
+              <div className="flex gap-2 mb-5">
+                {['USER', 'ADMIN'].map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setRolEditar(r)}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-bold font-['Oswald'] uppercase tracking-wider transition-all ${
+                      rolEditar === r
+                        ? 'bg-[#E63946] text-white shadow-lg shadow-[#E63946]/20'
+                        : 'bg-white/[0.05] text-white/40 hover:bg-white/[0.09] hover:text-white/65'
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+
+              {rolEditar === modalEditar.role ? null : (
+                <p className="text-white/35 text-xs mb-4 leading-relaxed">
+                  {rolEditar === 'ADMIN'
+                    ? '⚠ El usuario obtendrá acceso completo al panel de administración.'
+                    : '⚠ El usuario perderá el acceso al panel de administración.'}
+                </p>
+              )}
+
+              {errorEditar && (
+                <div className="bg-[#E63946]/10 border border-[#E63946]/30 rounded-lg px-4 py-3 text-[#E63946] text-sm">
+                  {errorEditar}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 px-7 py-5 border-t border-white/[0.06] bg-[#111111]">
+              <button
+                type="button"
+                onClick={() => { setModalEditar(null); setErrorEditar('') }}
+                className="flex-1 bg-[#1E1E1E] border border-white/10 text-white/65 py-3 rounded-xl text-sm font-semibold hover:text-white hover:border-white/20 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleCambiarRol}
+                disabled={guardandoRol || rolEditar === modalEditar.role}
+                className="flex-1 bg-[#E63946] hover:bg-[#c8303c] text-white py-3 rounded-xl font-['Oswald'] font-bold uppercase tracking-wider text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {guardandoRol ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Panel lateral perfil ─────────────────────────────────────────── */}
+      {panelPerfil && (() => {
+        const avatarColor = getAvatarColor(panelPerfil.fullName || panelPerfil.email)
+        const avatarInicial = (panelPerfil.fullName || panelPerfil.email || '?')[0].toUpperCase()
+        const fechaRegistro = panelPerfil.createdAt
+          ? new Date(panelPerfil.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
+          : null
+        const fechaSuspension = panelPerfil.suspendedAt
+          ? new Date(panelPerfil.suspendedAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+          : null
+
+        return (
+          <>
+            <button
+              type="button"
+              aria-label="Cerrar panel"
+              className="fixed inset-0 bg-black/50 z-40 w-full cursor-default"
+              onClick={() => setPanelPerfil(null)}
+            />
+
+            <aside className="fixed inset-y-0 right-0 w-80 bg-[#161616] border-l border-white/[0.06] z-50 flex flex-col overflow-hidden">
+
+              {/* Cabecera */}
+              <div className="flex items-center justify-between px-5 h-[65px] border-b border-white/[0.06] flex-shrink-0">
+                <p className="text-white/25 text-[10px] font-bold uppercase tracking-[0.2em]">Perfil de usuario</p>
+                <button
+                  type="button"
+                  onClick={() => setPanelPerfil(null)}
+                  className="text-white/30 hover:text-white transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+
+              {/* Avatar + identificación */}
+              <div className="px-5 py-5 border-b border-white/[0.06] flex-shrink-0">
+                <div className="flex items-center gap-4 mb-3">
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0"
+                    style={{
+                      backgroundColor: `${avatarColor}22`,
+                      border: `2px solid ${avatarColor}55`,
+                      color: avatarColor,
+                    }}
+                  >
+                    {avatarInicial}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-white font-semibold text-sm truncate leading-tight">{panelPerfil.fullName}</p>
+                    <p className="text-white/40 text-xs truncate mt-0.5">{panelPerfil.email}</p>
+                    {panelPerfil.nickname && (
+                      <p className="text-white/22 text-xs mt-0.5">@{panelPerfil.nickname}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <RolBadge rol={panelPerfil.role} />
+                  <StatusBadge status={panelPerfil.status} />
+                </div>
+              </div>
+
+              {/* Cuerpo scrollable */}
+              <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.05] text-center">
+                    <p className="font-['Oswald'] text-3xl font-bold text-white leading-none">{panelPerfil.rutinasCount ?? 0}</p>
+                    <p className="text-white/30 text-[10px] uppercase tracking-widest mt-1.5">Rutinas</p>
+                  </div>
+                  <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.05] text-center">
+                    <p className="font-['Oswald'] text-3xl font-bold text-white leading-none">{panelPerfil.sesionesCount ?? 0}</p>
+                    <p className="text-white/30 text-[10px] uppercase tracking-widest mt-1.5">Sesiones</p>
+                  </div>
+                </div>
+
+                {/* Info general */}
+                <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] px-4">
+                  <InfoRow label="Último acceso" value={formatUltimaVez(panelPerfil.lastSeenAt)} />
+                  <InfoRow label="Registrado" value={fechaRegistro} />
+                </div>
+
+                {/* Suspensión */}
+                {panelPerfil.suspended && (
+                  <div className="bg-[#E63946]/[0.06] border border-[#E63946]/20 rounded-xl p-4">
+                    <p className="text-[#E63946] text-[10px] font-bold uppercase tracking-widest mb-2">Cuenta suspendida</p>
+                    {fechaSuspension && (
+                      <p className="text-white/45 text-xs mb-1">Desde: {fechaSuspension}</p>
+                    )}
+                    {panelPerfil.suspendedReason
+                      ? <p className="text-white/40 text-xs italic">"{panelPerfil.suspendedReason}"</p>
+                      : <p className="text-white/22 text-xs">Sin motivo especificado</p>
+                    }
+                  </div>
+                )}
+
+                {/* Acciones rápidas */}
+                <div className="flex flex-col gap-2">
+                  <p className="text-white/20 text-[10px] font-bold uppercase tracking-widest mb-1">Acciones rápidas</p>
+                  <button
+                    type="button"
+                    disabled={esAdminTarget(panelPerfil)}
+                    title={esAdminTarget(panelPerfil) ? 'No disponible para administradores' : undefined}
+                    onClick={() => { setPanelPerfil(null); setModalEditar(panelPerfil); setRolEditar(panelPerfil.role); setErrorEditar('') }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-white/55 hover:text-white hover:bg-white/[0.08] text-sm font-medium transition-all text-left disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white/[0.04] disabled:hover:text-white/55"
+                  >
+                    <IconEdit />
+                    Cambiar rol
+                  </button>
+                  {panelPerfil.suspended ? (
+                    <button
+                      type="button"
+                      disabled={esAdminTarget(panelPerfil)}
+                      title={esAdminTarget(panelPerfil) ? 'No disponible para administradores' : undefined}
+                      onClick={() => { setPanelPerfil(null); handleActivar(panelPerfil) }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-[#00C9A7]/[0.08] border border-[#00C9A7]/20 text-[#00C9A7] hover:bg-[#00C9A7]/[0.14] text-sm font-medium transition-all text-left disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-[#00C9A7]/[0.08]"
+                    >
+                      <IconPlay />
+                      Reactivar cuenta
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={esAdminTarget(panelPerfil)}
+                      title={esAdminTarget(panelPerfil) ? 'No disponible para administradores' : undefined}
+                      onClick={() => { setPanelPerfil(null); setModalUsuario(panelPerfil) }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-orange-500/[0.08] border border-orange-500/20 text-orange-400 hover:bg-orange-500/[0.14] text-sm font-medium transition-all text-left disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-orange-500/[0.08]"
+                    >
+                      <IconPause />
+                      Suspender cuenta
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={esAdminTarget(panelPerfil)}
+                    title={esAdminTarget(panelPerfil) ? 'No disponible para administradores' : undefined}
+                    onClick={() => { setPanelPerfil(null); setModalEliminar(panelPerfil); setErrorEliminar('') }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-[#E63946]/[0.08] border border-[#E63946]/20 text-[#E63946] hover:bg-[#E63946]/[0.14] text-sm font-medium transition-all text-left disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-[#E63946]/[0.08]"
+                  >
+                    <IconTrash />
+                    Eliminar usuario
+                  </button>
+                </div>
+
+              </div>
+            </aside>
+          </>
+        )
+      })()}
 
     </AdminLayout>
   )

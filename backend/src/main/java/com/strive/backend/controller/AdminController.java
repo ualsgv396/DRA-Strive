@@ -60,48 +60,46 @@ public class AdminController {
 
     @Transactional(readOnly = true)
     @GetMapping("/dashboard")
-    public Map<String, Object> getDashboard() {
-        LocalDateTime now             = LocalDateTime.now();
-        LocalDateTime inicioMes       = now.withDayOfMonth(1).truncatedTo(ChronoUnit.DAYS);
-        LocalDateTime inicioMesAnterior = inicioMes.minusMonths(1);
-        LocalDateTime hace7Dias       = now.minusDays(7);
-        LocalDateTime hace14Dias      = now.minusDays(14);
-        LocalDateTime hace30Dias      = now.minusDays(30);
-        LocalDateTime en24Horas       = now.plusHours(24);
+    public Map<String, Object> getDashboard(
+            @RequestParam(defaultValue = "30d") String periodo) {
+        int dias = switch (periodo) {
+            case "7d"  -> 7;
+            case "98d" -> 98;
+            case "1a"  -> 365;
+            default    -> 30;
+        };
+        LocalDateTime now              = LocalDateTime.now();
+        LocalDateTime inicioPeriodo    = now.minusDays(dias);
+        LocalDateTime inicioPeriodoAnt = now.minusDays(dias * 2L);
+        LocalDateTime en24Horas        = now.plusHours(24);
 
         long totalUsuarios   = userRepository.count();
         long totalEjercicios = exerciseRepository.count();
         long totalRutinas    = routineRepository.count();
 
-        long usuariosNuevosEsteMes  = userRepository.countByCreatedAtAfter(inicioMes);
-        long usuariosMesAnterior    = userRepository.countByCreatedAtBetween(inicioMesAnterior, inicioMes);
+        long usuariosNuevosEsteMes = userRepository.countByCreatedAtAfter(inicioPeriodo);
+        long usuariosMesAnterior   = userRepository.countByCreatedAtBetween(inicioPeriodoAnt, inicioPeriodo);
         double tasaCrecimientoUsuarios = usuariosMesAnterior > 0
             ? Math.round((double) usuariosNuevosEsteMes / usuariosMesAnterior * 1000.0) / 10.0
             : 0.0;
 
-        long rutinasNuevasEsteMes = routineRepository.countByCreatedAtAfter(inicioMes);
+        long rutinasNuevasEsteMes = routineRepository.countByCreatedAtAfter(inicioPeriodo);
 
-        List<User>    usuariosRecientes = userRepository.findByCreatedAtAfterOrderByCreatedAtAsc(hace30Dias);
-        List<Routine> rutinasRecientes  = routineRepository.findByCreatedAtAfterOrderByCreatedAtAsc(hace30Dias);
-        List<Long> tendenciaUsuarios = contarPorDia(
-            usuariosRecientes.stream().map(User::getCreatedAt).collect(Collectors.toList()), 30);
-        List<Long> tendenciaRutinas = contarPorDia(
-            rutinasRecientes.stream().map(Routine::getCreatedAt).collect(Collectors.toList()), 30);
+        int puntosTendencia = Math.min(dias, 30);
+        List<User>    usuariosRecientes = userRepository.findByCreatedAtAfterOrderByCreatedAtAsc(inicioPeriodo);
+        List<Routine> rutinasRecientes  = routineRepository.findByCreatedAtAfterOrderByCreatedAtAsc(inicioPeriodo);
+        List<Long> tendenciaUsuarios = contarBuckets(
+            usuariosRecientes.stream().map(User::getCreatedAt).collect(Collectors.toList()), dias, puntosTendencia);
+        List<Long> tendenciaRutinas = contarBuckets(
+            rutinasRecientes.stream().map(Routine::getCreatedAt).collect(Collectors.toList()), dias, puntosTendencia);
 
         List<TrainingSession> sesionesRecientes =
-            trainingSessionRepository.findByStartedAtAfterWithDetails(hace7Dias);
+            trainingSessionRepository.findByStartedAtAfterWithDetails(inicioPeriodo);
 
-        Map<String, Long> sesionesPorDia = new LinkedHashMap<>();
-        for (int i = 6; i >= 0; i--) {
-            sesionesPorDia.put(now.minusDays(i).toLocalDate().toString(), 0L);
-        }
-        for (TrainingSession ts : sesionesRecientes) {
-            String dia = ts.getStartedAt().toLocalDate().toString();
-            sesionesPorDia.computeIfPresent(dia, (k, v) -> v + 1);
-        }
+        Map<String, Long> sesionesPorDia = buildSessionChart(sesionesRecientes, dias, now);
         long totalSesiones7Dias = sesionesPorDia.values().stream().mapToLong(Long::longValue).sum();
 
-        long sesionesSemanaAnterior = trainingSessionRepository.countByStartedAtBetween(hace14Dias, hace7Dias);
+        long sesionesSemanaAnterior = trainingSessionRepository.countByStartedAtBetween(inicioPeriodoAnt, inicioPeriodo);
         double tasaCrecimientoSesiones = sesionesSemanaAnterior > 0
             ? Math.round((double)(totalSesiones7Dias - sesionesSemanaAnterior) / sesionesSemanaAnterior * 1000.0) / 10.0
             : 0.0;
@@ -259,6 +257,10 @@ public class AdminController {
             @RequestBody Map<String, String> body) {
         User u = userRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        if (u.getRole() == UserRole.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "No se puede suspender a un administrador");
+        }
         u.setSuspended(true);
         u.setSuspendedReason(body.get("reason"));
         u.setSuspendedAt(LocalDateTime.now());
@@ -273,6 +275,40 @@ public class AdminController {
         u.setSuspended(false);
         u.setSuspendedReason(null);
         u.setSuspendedAt(null);
+        userRepository.save(u);
+        return ResponseEntity.ok().build();
+    }
+
+    @Transactional
+    @DeleteMapping("/users/{id}")
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+        User u = userRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        if (u.getRole() == UserRole.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "No se puede eliminar a un administrador");
+        }
+        userRepository.delete(u);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/users/{id}/role")
+    public ResponseEntity<Void> changeUserRole(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        UserRole nuevoRol;
+        try {
+            nuevoRol = UserRole.valueOf(body.getOrDefault("role", "").toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rol inválido");
+        }
+        User u = userRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        if (u.getRole() == UserRole.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "No se puede modificar el rol de un administrador");
+        }
+        u.setRole(nuevoRol);
         userRepository.save(u);
         return ResponseEntity.ok().build();
     }
@@ -331,17 +367,56 @@ public class AdminController {
         return "INACTIVO";
     }
 
-    private List<Long> contarPorDia(List<LocalDateTime> timestamps, int dias) {
-        List<Long> counts = new ArrayList<>();
-        LocalDate hoy = LocalDate.now();
-        for (int i = dias - 1; i >= 0; i--) {
-            LocalDate dia = hoy.minusDays(i);
-            long count = timestamps.stream()
-                .filter(ts -> ts.toLocalDate().equals(dia))
-                .count();
-            counts.add(count);
+    private Map<String, Long> buildSessionChart(
+            List<TrainingSession> sesiones, int dias, LocalDateTime now) {
+        if (dias <= 30) {
+            Map<String, Long> result = new LinkedHashMap<>();
+            for (int i = dias - 1; i >= 0; i--)
+                result.put(now.minusDays(i).toLocalDate().toString(), 0L);
+            for (TrainingSession ts : sesiones) {
+                String dia = ts.getStartedAt().toLocalDate().toString();
+                result.computeIfPresent(dia, (k, v) -> v + 1);
+            }
+            return result;
         }
-        return counts;
+        if (dias <= 98) {
+            int semanas = dias / 7;
+            Map<String, Long> result = new LinkedHashMap<>();
+            for (int i = semanas - 1; i >= 0; i--)
+                result.put(now.minusDays((long)(i + 1) * 7).toLocalDate().toString(), 0L);
+            for (TrainingSession ts : sesiones) {
+                long daysAgo = ChronoUnit.DAYS.between(ts.getStartedAt().toLocalDate(), now.toLocalDate());
+                int semana = (int)(daysAgo / 7);
+                if (semana < semanas) {
+                    String key = now.minusDays((long)(semana + 1) * 7).toLocalDate().toString();
+                    result.merge(key, 1L, Long::sum);
+                }
+            }
+            return result;
+        }
+        Map<String, Long> result = new LinkedHashMap<>();
+        for (int i = 11; i >= 0; i--)
+            result.put(now.toLocalDate().minusMonths(i).withDayOfMonth(1).toString(), 0L);
+        for (TrainingSession ts : sesiones) {
+            String mes = ts.getStartedAt().toLocalDate().withDayOfMonth(1).toString();
+            result.merge(mes, 1L, Long::sum);
+        }
+        return result;
+    }
+
+    private List<Long> contarBuckets(List<LocalDateTime> timestamps, int dias, int numBuckets) {
+        LocalDateTime ahora = LocalDateTime.now();
+        double duracion = (double) dias / numBuckets;
+        List<Long> result = new ArrayList<>();
+        for (int i = 0; i < numBuckets; i++) {
+            LocalDateTime ini = ahora.minusDays(Math.round((numBuckets - i) * duracion));
+            LocalDateTime fin = ahora.minusDays(Math.round((numBuckets - 1 - i) * duracion));
+            long count = timestamps.stream()
+                .filter(ts -> !ts.isBefore(ini) && ts.isBefore(fin))
+                .count();
+            result.add(count);
+        }
+        return result;
     }
 
     private Map<String, Object> eventoMap(String tipo, String actor, String descripcion, LocalDateTime ts) {

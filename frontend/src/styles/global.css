@@ -194,3 +194,370 @@ select:focus-visible {
 }
 .logout-btn:hover  { background-color: #C1121F !important; transform: scale(1.1); }
 .logout-btn:active { transform: scale(0.93); }
+
+
+/* ─────────────────────────────────────────────────────────────
+   Auth pages (Login & Registro) — responsive-first
+   Añadir al FINAL de src/styles/global.css
+   ───────────────────────────────────────────────────────────── */
+
+.auth-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg-1);
+}
+
+/* ── Hero compacto (mobile / tablet) ── */
+.auth-hero {
+  background: var(--primary-red);
+  color: #fff;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.auth-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(255,255,255,0.18), transparent 55%),
+    radial-gradient(60% 60% at 0% 100%, rgba(0,0,0,0.30), transparent 60%);
+  pointer-events: none;
+}
+.auth-logo {
+  font-family: 'Oswald', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  font-style: italic;
+  color: #fff;
+  letter-spacing: 3px;
+  text-decoration: none;
+  position: relative;
+  z-index: 1;
+}
+.auth-hero-tag {
+  font-size: 13px;
+  color: rgba(255,255,255,0.85);
+  position: relative;
+  z-index: 1;
+  text-align: right;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── Hero grande (desktop split) — oculto por defecto ── */
+.auth-split-hero {
+  display: none;
+}
+
+/* ── Contenedor del formulario ── */
+.auth-form-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 20px 32px;
+}
+.auth-form-card {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.auth-form-head h2 {
+  font-family: 'Oswald', sans-serif;
+  font-size: clamp(28px, 5vw, 36px);
+  font-weight: 700;
+  text-transform: uppercase;
+  margin: 0 0 8px;
+  color: var(--txt-1);
+  letter-spacing: 0.5px;
+  line-height: 1.05;
+}
+.auth-form-head p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--txt-3);
+  font-family: 'Inter', sans-serif;
+}
+.auth-link {
+  color: var(--primary-red);
+  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+.auth-link:hover { text-decoration: underline; }
+
+/* ── Form layout ── */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.auth-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--txt-2);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── Inputs ── */
+.auth-input-wrap {
+  position: relative;
+}
+.auth-input {
+  width: 100%;
+  background: var(--bg-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  font-size: 16px;            /* ≥16px evita zoom automático en iOS */
+  color: var(--txt-1);
+  font-family: 'Inter', sans-serif;
+  outline: none;
+  min-height: 52px;
+  transition:
+    border-color var(--t-base),
+    box-shadow var(--t-base),
+    background var(--t-base);
+}
+.auth-input::placeholder { color: var(--txt-4); }
+.auth-input:hover { border-color: var(--line-3); background: var(--bg-4); }
+.auth-input:focus {
+  border-color: var(--primary-red);
+  box-shadow: 0 0 0 3px rgba(230,57,70,0.18);
+}
+.auth-input[aria-invalid="true"] {
+  border-color: var(--primary-red);
+}
+
+/* Toggle mostrar/ocultar contraseña */
+.auth-toggle-pw {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: 0;
+  color: var(--txt-3);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  font-family: 'Inter', sans-serif;
+  min-height: 36px;
+}
+.auth-toggle-pw:hover { color: var(--txt-1); background: var(--line-1); }
+
+/* Cuadrícula 2 columnas (Registro) */
+.auth-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 480px) {
+  .auth-grid-2 { grid-template-columns: 1fr; gap: 16px; }
+}
+
+/* Fila auxiliar (forgot password) */
+.auth-helper-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: -4px;
+}
+.auth-helper-row a { font-size: 13px; }
+
+/* Errores */
+.auth-error {
+  background: rgba(230, 57, 70, 0.12);
+  border: 1px solid rgba(230, 57, 70, 0.4);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-size: 14px;
+  color: #ff6b76;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  line-height: 1.4;
+  font-family: 'Inter', sans-serif;
+  animation: authShake 0.32s ease;
+}
+.auth-error::before {
+  content: "⚠";
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+@keyframes authShake {
+  0%,100% { transform: translateX(0); }
+  25%     { transform: translateX(-4px); }
+  75%     { transform: translateX(4px); }
+}
+
+/* Botón primario */
+.auth-button {
+  background: var(--primary-red);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-md);
+  padding: 16px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: 'Oswald', sans-serif;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  min-height: 52px;
+  margin-top: 4px;
+  transition:
+    background var(--t-base),
+    transform var(--t-base),
+    box-shadow var(--t-base),
+    opacity var(--t-base);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.auth-button:hover:not(:disabled) {
+  background: var(--primary-red-dark);
+  box-shadow: var(--glow-red);
+  transform: translateY(-1px);
+}
+.auth-button:active:not(:disabled) { transform: translateY(0); }
+.auth-button:disabled { opacity: 0.7; cursor: not-allowed; }
+
+/* Spinner para estado loading */
+.auth-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+/* Texto legal (Registro) */
+.auth-legal {
+  font-size: 12px;
+  color: var(--txt-4);
+  text-align: center;
+  line-height: 1.6;
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+}
+.auth-legal a {
+  color: var(--txt-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+/* ── Desktop (≥900px): split de 2 columnas ── */
+@media (min-width: 900px) {
+  .auth-page { flex-direction: row; }
+
+  .auth-hero { display: none; }
+
+  .auth-split-hero {
+    display: flex;
+    flex: 1;
+    background: var(--primary-red);
+    color: #fff;
+    padding: 48px;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+    min-height: 100vh;
+  }
+  .auth-split-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(120% 80% at 100% 0%, rgba(255,255,255,0.18), transparent 55%),
+      radial-gradient(60% 60% at 0% 100%, rgba(0,0,0,0.30), transparent 60%),
+      repeating-linear-gradient(135deg, rgba(255,255,255,0.04) 0 2px, transparent 2px 24px);
+    pointer-events: none;
+  }
+  .auth-split-hero > * { position: relative; z-index: 1; }
+  .auth-split-hero .auth-logo {
+    font-size: 26px;
+    letter-spacing: 4px;
+  }
+  .auth-hero-title {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    line-height: 0.95;
+    margin: 0 0 16px;
+    font-size: clamp(48px, 6vw, 72px);
+    letter-spacing: -0.5px;
+    color: #fff;
+  }
+  .auth-hero-subtitle {
+    font-size: clamp(16px, 1.6vw, 18px);
+    color: rgba(255,255,255,0.85);
+    margin: 0;
+    max-width: 32ch;
+    line-height: 1.5;
+    font-family: 'Inter', sans-serif;
+  }
+  .auth-hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.78);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-family: 'Oswald', sans-serif;
+    font-weight: 500;
+  }
+  .auth-hero-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .auth-hero-meta span::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    background: #fff;
+    border-radius: 50%;
+  }
+
+  .auth-form-wrap {
+    flex: 1;
+    padding: 48px 64px;
+  }
+  .auth-form-card { max-width: 420px; }
+}
+.ej-buscador {
+  color-scheme: dark;            
+}
+.ej-buscador::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+.ej-buscador:focus {
+  border-color: #E63946;
+  box-shadow: 0 0 0 3px rgba(230, 57, 70, 0.18);
+}

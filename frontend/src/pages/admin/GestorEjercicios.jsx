@@ -49,6 +49,8 @@ export default function GestorEjercicios() {
   const [seleccionados, setSeleccionados]         = useState([])
   const [paginaActual, setPaginaActual]           = useState(1)
   const [filasPorPagina, setFilasPorPagina]       = useState(25)
+  const [modalBulkEliminar, setModalBulkEliminar] = useState(false)
+  const [bulkEliminando, setBulkEliminando]       = useState(false)
 
   useEffect(() => { cargarEjercicios() }, [])
 
@@ -117,6 +119,26 @@ export default function GestorEjercicios() {
     }
   }
 
+  const handleBulkEliminar = async () => {
+    if (!seleccionados.length) return
+    setBulkEliminando(true)
+    try {
+      const resultados = await Promise.allSettled(
+        seleccionados.map(id => api.delete(`/exercises/${id}`))
+      )
+      const exitosos = new Set(
+        seleccionados.filter((_, i) => resultados[i].status === 'fulfilled')
+      )
+      setEjercicios(prev => prev.filter(e => !exitosos.has(e.id)))
+      setSeleccionados([])
+      setModalBulkEliminar(false)
+    } catch (err) {
+      console.error('Error en eliminación masiva:', err)
+    } finally {
+      setBulkEliminando(false)
+    }
+  }
+
   const cerrarModalEliminar = () => {
     setConfirmarEliminar(null)
     setTextoConfirmacion('')
@@ -182,6 +204,37 @@ export default function GestorEjercicios() {
     AVANZADO:     'border border-[#E63946]/40 text-[#E63946]',
   }
 
+  const inicioMes = new Date()
+  inicioMes.setDate(1)
+  inicioMes.setHours(0, 0, 0, 0)
+  const nuevosEsteMes = ejercicios.filter(
+    e => e.createdAt && new Date(e.createdAt) >= inicioMes
+  ).length
+
+  const exportarCSVEjercicios = (lista) => {
+    if (!lista.length) return
+    const cols = ['Título', 'Tipo', 'Dificultad', 'Grupos musculares', 'Descripción', 'URL imagen', 'Actualizado']
+    const filas = lista.map(e => [
+      e.title ?? '',
+      e.type ?? '',
+      e.difficulty ?? '',
+      e.muscleGroups?.join(', ') ?? '',
+      e.description ?? '',
+      e.imageUrl ?? '',
+      e.updatedAt ? new Date(e.updatedAt).toLocaleDateString('es-ES') : '',
+    ])
+    const csv = [cols, ...filas]
+      .map(fila => fila.map(v => `"${String(v).replaceAll('"', '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `strive-ejercicios-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const filtroBtn = (active) =>
     `px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
       active
@@ -204,11 +257,21 @@ export default function GestorEjercicios() {
           <h1 className="font-['Oswald'] text-5xl font-bold uppercase leading-none mb-2">Ejercicios</h1>
           <p className="text-white/40 text-sm">
             {ejercicios.length} ejercicios en catálogo
+            {nuevosEsteMes > 0 && (
+              <span className="text-[#E63946]"> · +{nuevosEsteMes} este mes</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3 mt-2">
           <button className="bg-[#1A1A1A] border border-white/10 text-white/70 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-white/5 transition-colors">
             Importar CSV
+          </button>
+          <button
+            onClick={() => exportarCSVEjercicios(ejerciciosFiltrados)}
+            disabled={!ejerciciosFiltrados.length}
+            className="bg-[#1A1A1A] border border-white/10 text-white/70 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Exportar CSV{ejerciciosFiltrados.length === ejercicios.length ? '' : ` (${ejerciciosFiltrados.length})`}
           </button>
           <button
             onClick={abrirCrear}
@@ -272,11 +335,15 @@ export default function GestorEjercicios() {
             <button className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1A1A1A] border border-white/15 text-white/70 hover:text-white transition-colors">
               Cambiar tipo
             </button>
-            <button className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1A1A1A] border border-white/15 text-white/70 hover:text-white transition-colors">
-              Exportar
+            <button
+              onClick={() => exportarCSVEjercicios(ejercicios.filter(e => seleccionados.includes(e.id)))}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1A1A1A] border border-white/15 text-white/70 hover:text-white transition-colors">
+              Exportar selección
             </button>
-            <button className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#E63946]/15 border border-[#E63946]/30 text-[#E63946] hover:bg-[#E63946]/25 transition-colors">
-              Eliminar
+            <button
+              onClick={() => setModalBulkEliminar(true)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#E63946]/15 border border-[#E63946]/30 text-[#E63946] hover:bg-[#E63946]/25 transition-colors">
+              Eliminar ({seleccionados.length})
             </button>
           </div>
         </div>
@@ -474,6 +541,49 @@ export default function GestorEjercicios() {
           </>
         )}
       </div>
+
+      {/* ── MODAL BULK ELIMINAR ──────────────────────────────────────────────── */}
+      {modalBulkEliminar && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+          <div
+            className="bg-[#161616] rounded-2xl w-full max-w-sm border border-[#E63946]/25 overflow-hidden"
+            style={{ boxShadow: '0 0 40px rgba(230,57,70,0.12), 0 25px 60px rgba(0,0,0,0.6)' }}
+          >
+            <div className="p-7">
+              <div
+                className="w-12 h-12 rounded-xl bg-[#E63946]/15 border border-[#E63946]/30 flex items-center justify-center mb-5 text-[#E63946]"
+                style={{ boxShadow: '0 0 16px rgba(230,57,70,0.2)' }}
+              >
+                <IconTrash />
+              </div>
+              <h3 className="font-['Oswald'] text-2xl font-bold uppercase mb-2 tracking-wide">
+                ¿Eliminar {seleccionados.length} ejercicio{seleccionados.length === 1 ? '' : 's'}?
+              </h3>
+              <p className="text-white/55 text-sm leading-relaxed mb-5">
+                Se eliminarán permanentemente del catálogo. Las rutinas que los usen quedarán sin esos ejercicios. Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <div className="flex gap-3 px-7 py-5 border-t border-white/[0.06] bg-[#111111]">
+              <button
+                type="button"
+                onClick={() => setModalBulkEliminar(false)}
+                disabled={bulkEliminando}
+                className="flex-1 bg-[#1E1E1E] border border-white/10 text-white/65 py-3 rounded-xl text-sm font-semibold hover:text-white hover:border-white/20 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkEliminar}
+                disabled={bulkEliminando}
+                className="flex-1 bg-[#E63946] hover:bg-[#c8303c] text-white py-3 rounded-xl font-['Oswald'] font-bold uppercase tracking-wider text-sm transition-colors disabled:opacity-60"
+              >
+                {bulkEliminando ? 'Eliminando...' : `Eliminar ${seleccionados.length}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── MODAL CREAR / EDITAR ──────────────────────────────────────────────── */}
       {mostrarModal && (

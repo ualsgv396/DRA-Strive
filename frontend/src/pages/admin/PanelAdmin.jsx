@@ -174,6 +174,13 @@ function EventoActividad({ evento }) {
 
 const PERIODOS = ['7d', '30d', '98d', '1a']
 
+const LABEL_PERIODO = {
+  '7d':  { subtitulo: 'ÚLTIMOS\n7 DÍAS',   nuevos: 'esta semana'  },
+  '30d': { subtitulo: 'ÚLTIMOS\n30 DÍAS',  nuevos: 'este mes'     },
+  '98d': { subtitulo: 'ÚLTIMOS\n98 DÍAS',  nuevos: 'en 3 meses'   },
+  '1a':  { subtitulo: 'ÚLTIMO\nAÑO',       nuevos: 'este año'     },
+}
+
 export default function PanelAdmin() {
   const navigate = useNavigate()
   const [datos, setDatos] = useState(null)
@@ -181,11 +188,13 @@ export default function PanelAdmin() {
   const [periodo, setPeriodo] = useState('30d')
 
   useEffect(() => {
-    api.get('/admin/dashboard')
+    setCargando(true)
+    setDatos(null)
+    api.get(`/admin/dashboard?periodo=${periodo}`)
       .then(r => setDatos(r.data))
       .catch(e => console.error('Error cargando dashboard:', e))
       .finally(() => setCargando(false))
-  }, [])
+  }, [periodo])
 
   const tasaSesionesPositiva = (datos?.tasaCrecimientoSesiones ?? 0) >= 0
   const tasaUsuariosPositiva = (datos?.tasaCrecimientoUsuarios ?? 0) >= 0
@@ -223,7 +232,7 @@ export default function PanelAdmin() {
           valor={datos?.totalUsuarios}
           badge={datos ? `${datos.tasaCrecimientoUsuarios}%` : undefined}
           badgePositivo={tasaUsuariosPositiva}
-          extraTexto={datos ? `+${datos.usuariosNuevosEsteMes} nuevos este mes` : undefined}
+          extraTexto={datos ? `+${datos.usuariosNuevosEsteMes} nuevos ${LABEL_PERIODO[periodo].nuevos}` : undefined}
           chart={<MiniLineChart data={datos?.tendenciaUsuarios} color="#E63946" />}
           cargando={cargando} />
 
@@ -236,7 +245,7 @@ export default function PanelAdmin() {
           chart={<MiniLineChart data={datos?.tendenciaRutinas} color="#F4A340" />}
           cargando={cargando} />
 
-        <MetricCard titulo="Sesiones" subtitulo={'ÚLTIMOS\n7 DÍAS'}
+        <MetricCard titulo="Sesiones" subtitulo={LABEL_PERIODO[periodo].subtitulo}
           valor={datos?.totalSesiones7Dias}
           badge={datos ? `${Math.abs(datos.tasaCrecimientoSesiones)}%` : undefined}
           badgePositivo={tasaSesionesPositiva}

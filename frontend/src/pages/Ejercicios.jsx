@@ -69,6 +69,8 @@ export default function Ejercicios() {
     }
   }
 
+  // NOTA: la lógica de sincronización se conserva intacta (el botón se ha retirado
+  // del diseño por requisito visual). Disponible para reutilizar si se vuelve a necesitar.
   const handleSincronizar = async () => {
     try {
       setSincronizando(true)
@@ -190,13 +192,6 @@ export default function Ejercicios() {
             <h1 style={s.titulo}>Catálogo de ejercicios</h1>
             <p style={s.subtitulo}>{ejercicios.length} ejercicios disponibles</p>
           </div>
-          <button
-            style={{ ...s.botonSync, opacity: sincronizando ? 0.6 : 1, width: isMobile ? '100%' : 'auto' }}
-            onClick={handleSincronizar}
-            disabled={sincronizando}
-          >
-            {sincronizando ? '⟳ Sincronizando...' : '⟳ Sincronizar'}
-          </button>
         </div>
 
         {error  && <div style={s.alertaError}>{error}</div>}
@@ -206,6 +201,7 @@ export default function Ejercicios() {
         <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
           <input
             type="search"
+            className="ej-buscador"
             placeholder="Buscar ejercicio..."
             value={busqueda}
             onChange={handleBuscar}
@@ -374,11 +370,13 @@ export default function Ejercicios() {
 }
 
 // ── Estilos ───────────────────────────────────────────────────────────────────
+// Refactor visual a tema oscuro. Tokens alineados con global.css:
+//   bg-1 #0D0D0D · bg-2 #131313 · bg-3 #1A1A1A · bg-4 #222 · red #E63946 · teal #4ECDC4
 const s = {
   contenedor: {
     width: '100%',
     minHeight: '100vh',
-    backgroundColor: '#f7f7f7',
+    backgroundColor: 'transparent',   // hereda el #0D0D0D del body
     display: 'flex',
     flexDirection: 'column',
   },
@@ -396,33 +394,26 @@ const s = {
     marginBottom: '20px',
     gap: '12px',
   },
-  titulo: { margin: '0 0 4px', fontSize: '24px', fontWeight: '800', color: '#111', fontFamily: "'Oswald', sans-serif" },
-  subtitulo: { margin: 0, fontSize: '13px', color: '#999' },
-  botonSync: {
-    padding: '10px 20px',
-    backgroundColor: '#E63946',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '700',
-    minHeight: '44px',
-    whiteSpace: 'nowrap',
-  },
+  titulo: { margin: '0 0 4px', fontSize: '24px', fontWeight: '800', color: '#FFFFFF', fontFamily: "'Oswald', sans-serif" },
+  subtitulo: { margin: 0, fontSize: '13px', color: 'rgba(255,255,255,0.45)' },
+  // (botón "Sincronizar" retirado del diseño por requisito visual)
   alertaError: {
-    backgroundColor: '#fde8ea', color: '#c0392b', padding: '12px 16px',
+    backgroundColor: 'rgba(230,57,70,0.12)', color: '#ff6b76', padding: '12px 16px',
+    border: '1px solid rgba(230,57,70,0.40)',
     borderRadius: '8px', marginBottom: '14px', fontSize: '14px',
   },
   alertaExito: {
-    backgroundColor: '#d4edda', color: '#155724', padding: '12px 16px',
+    backgroundColor: 'rgba(78,205,196,0.12)', color: '#4ECDC4', padding: '12px 16px',
+    border: '1px solid rgba(78,205,196,0.35)',
     borderRadius: '8px', marginBottom: '14px', fontSize: '14px', fontWeight: '600',
   },
   buscador: {
     padding: '12px 16px',
     fontSize: '15px',
-    border: '1px solid #ddd',
+    backgroundColor: '#1A1A1A',
+    border: '1px solid rgba(255,255,255,0.10)',
     borderRadius: '10px',
+    color: '#FFFFFF',
     boxSizing: 'border-box',
     outline: 'none',
     minHeight: '46px',
@@ -435,13 +426,13 @@ const s = {
     alignItems: 'center',
     gap: '6px',
     padding: '0 16px',
-    backgroundColor: '#fff',
-    border: '1px solid #ddd',
+    backgroundColor: '#1A1A1A',
+    border: '1px solid rgba(255,255,255,0.10)',
     borderRadius: '10px',
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '600',
-    color: '#333',
+    color: 'rgba(255,255,255,0.72)',
     minHeight: '46px',
     minWidth: '44px',
     whiteSpace: 'nowrap',
@@ -450,7 +441,7 @@ const s = {
   btnFiltrosActivo: {
     borderColor: '#E63946',
     color: '#E63946',
-    backgroundColor: 'rgba(230,57,70,0.05)',
+    backgroundColor: 'rgba(230,57,70,0.12)',
   },
   badgeFiltros: {
     backgroundColor: '#E63946',
@@ -470,13 +461,13 @@ const s = {
     alignItems: 'center',
     marginBottom: '10px',
   },
-  filtroLabel: { fontSize: '12px', fontWeight: '600', color: '#888' },
+  filtroLabel: { fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.45)' },
   chip: {
     padding: '7px 16px',
     borderRadius: '20px',
-    border: '1px solid #ddd',
-    backgroundColor: '#fff',
-    color: '#555',
+    border: '1px solid rgba(255,255,255,0.10)',
+    backgroundColor: '#1A1A1A',
+    color: 'rgba(255,255,255,0.72)',
     cursor: 'pointer',
     fontSize: '13px',
     fontWeight: '500',
@@ -492,9 +483,9 @@ const s = {
   chipGrupo: {
     padding: '6px 12px',
     borderRadius: '20px',
-    border: '1px solid #e0e0e0',
-    backgroundColor: '#fff',
-    color: '#666',
+    border: '1px solid rgba(255,255,255,0.10)',
+    backgroundColor: '#1A1A1A',
+    color: 'rgba(255,255,255,0.72)',
     cursor: 'pointer',
     fontSize: '12px',
     fontWeight: '500',
@@ -502,9 +493,9 @@ const s = {
     minHeight: '34px',
   },
   chipGrupoActivo: {
-    backgroundColor: '#222',
-    color: '#fff',
-    borderColor: '#222',
+    backgroundColor: '#FFFFFF',
+    color: '#0D0D0D',
+    borderColor: '#FFFFFF',
     fontWeight: '700',
   },
   // Chips activos compactos que aparecen debajo del buscador en móvil
@@ -514,19 +505,20 @@ const s = {
     gap: '4px',
     padding: '5px 12px',
     borderRadius: '20px',
-    backgroundColor: 'rgba(230,57,70,0.1)',
+    backgroundColor: 'rgba(230,57,70,0.14)',
     border: '1px solid rgba(230,57,70,0.4)',
-    color: '#E63946',
+    color: '#ff6b76',
     cursor: 'pointer',
     fontSize: '12px',
     fontWeight: '600',
   },
   // ── Drawer ──
   drawerPanel: {
-    backgroundColor: '#fff',
+    backgroundColor: '#131313',
+    borderTop: '1px solid rgba(255,255,255,0.08)',
   },
   drawerHandle: {
-    backgroundColor: '#bbb',
+    backgroundColor: 'rgba(255,255,255,0.30)',
   },
   drawerCabecera: {
     display: 'flex',
@@ -537,7 +529,7 @@ const s = {
   drawerTitulo: {
     fontSize: '20px',
     fontWeight: '700',
-    color: '#111',
+    color: '#FFFFFF',
     margin: 0,
     fontFamily: "'Oswald', sans-serif",
   },
@@ -554,7 +546,7 @@ const s = {
   drawerSeccion: {
     fontSize: '11px',
     fontWeight: '700',
-    color: '#aaa',
+    color: 'rgba(255,255,255,0.45)',
     textTransform: 'uppercase',
     letterSpacing: '1px',
     marginBottom: '12px',

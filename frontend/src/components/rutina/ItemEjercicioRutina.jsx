@@ -8,6 +8,7 @@ export default function ItemEjercicioRutina({
   onDelete,
   onMoveUp,
   onMoveDown,
+  readonly = false,
 }) {
   const [confirmando, setConfirmando] = useState(false)
   const { exercise } = routineExercise
@@ -60,8 +61,8 @@ export default function ItemEjercicioRutina({
         </div>
       </div>
 
-      {/* Acciones */}
-      {!confirmando ? (
+      {/* Acciones (ocultas en modo solo-lectura: rutina compartida por chat) */}
+      {readonly ? null : !confirmando ? (
         <div className="flex border-t border-white/5">
           <button
             onClick={() => onMoveUp(routineExercise)}

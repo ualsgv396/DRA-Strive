@@ -3,9 +3,7 @@ WORKDIR /app
 
 COPY package*.json ./
 
-# Forzamos el espejo alternativo que sí te respondía los segundos
-RUN npm config set registry https://registry.npmmirror.com && \
-    npm install --no-audit --no-fund --loglevel=error
+RUN npm install --registry https://registry.npmmirror.com --no-audit --no-fund --loglevel=error
 
 COPY . .
 

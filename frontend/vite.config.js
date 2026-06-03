@@ -7,4 +7,10 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  optimizeDeps: {
+    include: ['sockjs-client', '@stomp/stompjs'],
+  },
+  define: {
+    global: 'window', 
+  },
 })

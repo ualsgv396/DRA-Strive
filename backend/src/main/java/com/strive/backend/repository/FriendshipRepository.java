@@ -20,4 +20,15 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
     List<Friendship> findAcceptedFriendshipsForUser(@Param("userId") Long userId);
 
     List<Friendship> findByStatusAndAddresseeIdOrderByCreatedAtDesc(FriendshipStatus status, Long addresseeId);
+
+    /**
+     * Comprueba si dos usuarios tienen una amistad ACCEPTED en cualquier dirección.
+     */
+    @Query("""
+        SELECT COUNT(f) > 0 FROM Friendship f
+        WHERE f.status = com.strive.backend.domain.FriendshipStatus.ACCEPTED
+          AND ((f.requester.id = :a AND f.addressee.id = :b)
+            OR (f.requester.id = :b AND f.addressee.id = :a))
+        """)
+    boolean sonAmigos(@Param("a") Long userAId, @Param("b") Long userBId);
 }

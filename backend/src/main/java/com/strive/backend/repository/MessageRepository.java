@@ -55,21 +55,4 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
           AND m.isRead = false
         """)
     long countTotalUnreadByUserId(@Param("userId") Long userId);
-
-    /**
-     * Comprueba si el usuario participó (envió o recibió) en una conversación
-     * en la que se compartió la rutina dada. Se usa para autorizar la vista
-     * "shared-preview" y el clonado "save-from-chat": sólo quien recibió
-     * (o envió) el mensaje puede acceder a la rutina ajena por esa vía.
-     */
-    @Query("""
-        SELECT COUNT(m) > 0 FROM Message m
-        WHERE m.type = com.strive.backend.domain.MessageType.ROUTINE
-          AND m.routineId = :routineId
-          AND (m.conversation.userA.id = :userId OR m.conversation.userB.id = :userId)
-        """)
-    boolean existsRoutineSharedWithUser(
-        @Param("routineId") Long routineId,
-        @Param("userId") Long userId
-    );
 }

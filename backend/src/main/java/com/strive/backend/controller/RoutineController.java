@@ -103,28 +103,6 @@ public class RoutineController {
         return routineService.duplicateRoutine(id, currentUser.getId());
     }
 
-    /**
-     * Vista read-only de una rutina compartida por chat.
-     * No requiere ser propietario: basta con haber recibido (o enviado)
-     * un mensaje tipo ROUTINE referenciando esta rutina.
-     */
-    @GetMapping("/{id}/shared-preview")
-    public Routine sharedPreview(@PathVariable Long id) {
-        User currentUser = currentUserService.getCurrentUser();
-        return routineService.findSharedWithUser(id, currentUser.getId());
-    }
-
-    /**
-     * Clona una rutina recibida por chat en el panel del usuario actual.
-     * Sólo se permite si la rutina figura como compartida con él.
-     */
-    @PostMapping("/{id}/save-from-chat")
-    @ResponseStatus(HttpStatus.CREATED)
-    public Routine saveFromChat(@PathVariable Long id) {
-        User currentUser = currentUserService.getCurrentUser();
-        return routineService.saveSharedRoutineToMyAccount(id, currentUser.getId());
-    }
-
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {

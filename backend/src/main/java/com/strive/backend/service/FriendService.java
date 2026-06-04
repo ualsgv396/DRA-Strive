@@ -34,6 +34,7 @@ public class FriendService {
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
     private final FriendInviteTokenRepository inviteTokenRepository;
+    private final PresenceService presenceService;
 
     @Value("${app.invites.base-url:http://localhost:5173/amigos?invite=}")
     private String inviteBaseUrl;
@@ -44,11 +45,13 @@ public class FriendService {
     public FriendService(
             UserRepository userRepository,
             FriendshipRepository friendshipRepository,
-            FriendInviteTokenRepository inviteTokenRepository
+            FriendInviteTokenRepository inviteTokenRepository,
+            PresenceService presenceService
     ) {
         this.userRepository = userRepository;
         this.friendshipRepository = friendshipRepository;
         this.inviteTokenRepository = inviteTokenRepository;
+        this.presenceService = presenceService;
     }
 
     public List<FriendUserDto> listFriends(Authentication authentication) {
@@ -59,7 +62,7 @@ public class FriendService {
                 .map(relation -> relation.getRequester().getId().equals(current.getId())
                         ? relation.getAddressee()
                         : relation.getRequester())
-                .map(this::toFriendUser)
+                .map(this::toFriendUserConPresencia)
                 .toList();
     }
 
@@ -195,6 +198,16 @@ public class FriendService {
 
     private FriendUserDto toFriendUser(User user) {
         return new FriendUserDto(user.getId(), user.getFullName(), user.getNickname());
+    }
+
+    /** Igual que toFriendUser pero resolviendo el estado de presencia en tiempo real. */
+    private FriendUserDto toFriendUserConPresencia(User user) {
+        return new FriendUserDto(
+                user.getId(),
+                user.getFullName(),
+                user.getNickname(),
+                presenceService.estaEnLinea(user.getEmail())
+        );
     }
 
     private String buildQrBase64(String value) {

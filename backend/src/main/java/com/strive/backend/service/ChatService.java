@@ -31,18 +31,21 @@ public class ChatService {
     private final FriendshipRepository   friendshipRepository;
     private final UserRepository         userRepository;
     private final CurrentUserService     currentUserService;
+    private final PresenceService        presenceService;
 
     public ChatService(
             ConversationRepository conversationRepository,
             MessageRepository messageRepository,
             FriendshipRepository friendshipRepository,
             UserRepository userRepository,
-            CurrentUserService currentUserService) {
+            CurrentUserService currentUserService,
+            PresenceService presenceService) {
         this.conversationRepository = conversationRepository;
         this.messageRepository      = messageRepository;
         this.friendshipRepository   = friendshipRepository;
         this.userRepository         = userRepository;
         this.currentUserService     = currentUserService;
+        this.presenceService        = presenceService;
     }
 
     // ── Conversaciones ────────────────────────────────────────────────────────
@@ -212,7 +215,12 @@ public class ChatService {
             .countByConversationIdAndSenderIdNotAndIsReadFalse(c.getId(), myId);
         return new ConversationDto(
             c.getId(),
-            new FriendUserDto(otro.getId(), otro.getFullName(), otro.getNickname()),
+            new FriendUserDto(
+                otro.getId(),
+                otro.getFullName(),
+                otro.getNickname(),
+                presenceService.estaEnLinea(otro.getEmail())
+            ),
             c.getLastMessageAt(),
             sinLeer,
             c.getCreatedAt()

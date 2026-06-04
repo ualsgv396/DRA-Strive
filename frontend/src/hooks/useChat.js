@@ -10,6 +10,7 @@ import api from '../api/axios'
  *  - Lista de conversaciones con badge de no leídos
  *  - Conversación activa + historial de mensajes
  *  - Envío de mensajes (texto y rutinas compartidas)
+ *  - Presencia EN VIVO de amigos (online/offline) vía /user/queue/presence
  *
  * Patrón clave: `conversacionActivaRef` evita el problema de stale closure
  * dentro del handler STOMP, que se configura una sola vez en onConnect.
@@ -21,6 +22,9 @@ export function useChat() {
   const [conversacionActiva,     setConversacionActiva]     = useState(null)
   const [mensajes,               setMensajes]               = useState([])
   const [cargandoMensajes,       setCargandoMensajes]       = useState(false)
+  // Mapa de presencia en vivo: { [userId]: boolean }. Se rellena con los
+  // eventos /user/queue/presence y tiene prioridad sobre el snapshot REST.
+  const [presencia,              setPresencia]              = useState({})
 
   // Ref sincronizada para evitar stale closure en el handler STOMP
   const conversacionActivaRef = useRef(null)
@@ -35,6 +39,14 @@ export function useChat() {
     try {
       const { data } = await api.get('/chat/conversations')
       setConversaciones(data)
+      // Sembrar el mapa de presencia con el snapshot inicial del servidor
+      setPresencia(prev => {
+        const next = { ...prev }
+        data.forEach(c => {
+          if (c.otherUser) next[c.otherUser.id] = c.otherUser.online
+        })
+        return next
+      })
     } catch (e) {
       console.error('[Chat] Error al cargar conversaciones:', e)
     } finally {
@@ -76,6 +88,27 @@ export function useChat() {
           )
         )
       }
+    })
+
+    // Presencia en vivo: un amigo se conectó o desconectó
+    client.subscribe('/user/queue/presence', (frame) => {
+      const evento = JSON.parse(frame.body)   // { userId, fullName, online }
+      // 1. Mapa de presencia (lo consume la lista de amigos en Amigos.jsx)
+      setPresencia(prev => ({ ...prev, [evento.userId]: evento.online }))
+      // 2. Reflejarlo también en las conversaciones (cabecera/listado)
+      setConversaciones(prev =>
+        prev.map(c =>
+          c.otherUser?.id === evento.userId
+            ? { ...c, otherUser: { ...c.otherUser, online: evento.online } }
+            : c
+        )
+      )
+      // 3. Si la conversación abierta es con ese usuario, actualizar su cabecera
+      setConversacionActiva(prev =>
+        prev?.otherUser?.id === evento.userId
+          ? { ...prev, otherUser: { ...prev.otherUser, online: evento.online } }
+          : prev
+      )
     })
 
     // Errores del servidor (validación, auth, etc.)
@@ -172,6 +205,7 @@ export function useChat() {
     conversacionActiva,
     mensajes,
     cargandoMensajes,
+    presencia,
     abrirConversacion,
     cerrarConversacion,
     enviarMensaje,

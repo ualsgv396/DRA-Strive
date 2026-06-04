@@ -31,4 +31,20 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
             OR (f.requester.id = :b AND f.addressee.id = :a))
         """)
     boolean sonAmigos(@Param("a") Long userAId, @Param("b") Long userBId);
+
+    /**
+     * Devuelve los emails de los amigos ACEPTADOS de un usuario.
+     *
+     * Para cada amistad, selecciona el email del "otro" participante. Se usa
+     * para enviar eventos de presencia (online/offline) solo a los amigos del
+     * usuario que se conecta o desconecta. Devuelve Strings escalares, así que
+     * no hay carga perezosa de asociaciones ni necesidad de transacción abierta.
+     */
+    @Query("""
+        SELECT CASE WHEN f.requester.id = :userId THEN f.addressee.email ELSE f.requester.email END
+        FROM Friendship f
+        WHERE f.status = com.strive.backend.domain.FriendshipStatus.ACCEPTED
+          AND (f.requester.id = :userId OR f.addressee.id = :userId)
+        """)
+    List<String> findAcceptedFriendEmails(@Param("userId") Long userId);
 }

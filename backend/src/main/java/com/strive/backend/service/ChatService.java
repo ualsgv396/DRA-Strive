@@ -1,5 +1,6 @@
 package com.strive.backend.service;
 
+import com.strive.backend.domain.BadgeType;
 import com.strive.backend.domain.Conversation;
 import com.strive.backend.domain.Message;
 import com.strive.backend.domain.MessageType;
@@ -32,6 +33,7 @@ public class ChatService {
     private final UserRepository         userRepository;
     private final CurrentUserService     currentUserService;
     private final PresenceService        presenceService;
+    private final GamificationService    gamificationService;
 
     public ChatService(
             ConversationRepository conversationRepository,
@@ -39,13 +41,15 @@ public class ChatService {
             FriendshipRepository friendshipRepository,
             UserRepository userRepository,
             CurrentUserService currentUserService,
-            PresenceService presenceService) {
+            PresenceService presenceService,
+            GamificationService gamificationService) {
         this.conversationRepository = conversationRepository;
         this.messageRepository      = messageRepository;
         this.friendshipRepository   = friendshipRepository;
         this.userRepository         = userRepository;
         this.currentUserService     = currentUserService;
         this.presenceService        = presenceService;
+        this.gamificationService    = gamificationService;
     }
 
     // ── Conversaciones ────────────────────────────────────────────────────────
@@ -179,6 +183,11 @@ public class ChatService {
         // 5. Actualizar timestamp de última actividad en la conversación
         conv.setLastMessageAt(msg.getSentAt());
         conversationRepository.save(conv);
+
+        // 6. Otorgar logro FIRST_SHARE la primera vez que se comparte una rutina
+        if (type == MessageType.ROUTINE) {
+            gamificationService.otorgarSiNuevo(sender, BadgeType.FIRST_SHARE);
+        }
 
         return new EnviarMensajeResultado(toMessageDto(msg), destinatario.getEmail());
     }

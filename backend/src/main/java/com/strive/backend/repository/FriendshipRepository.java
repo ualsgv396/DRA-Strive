@@ -47,4 +47,20 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
           AND (f.requester.id = :userId OR f.addressee.id = :userId)
         """)
     List<String> findAcceptedFriendEmails(@Param("userId") Long userId);
+
+    @Query("""
+        SELECT COUNT(f) FROM Friendship f
+        WHERE f.status = com.strive.backend.domain.FriendshipStatus.ACCEPTED
+          AND (f.requester.id = :userId OR f.addressee.id = :userId)
+        """)
+    long countAmigos(@Param("userId") Long userId);
+
+    /** IDs de todos los amigos aceptados de un usuario. Usado para construir el feed. */
+    @Query("""
+        SELECT CASE WHEN f.requester.id = :userId THEN f.addressee.id ELSE f.requester.id END
+        FROM Friendship f
+        WHERE f.status = com.strive.backend.domain.FriendshipStatus.ACCEPTED
+          AND (f.requester.id = :userId OR f.addressee.id = :userId)
+        """)
+    List<Long> findAcceptedFriendIds(@Param("userId") Long userId);
 }

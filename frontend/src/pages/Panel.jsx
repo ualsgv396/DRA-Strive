@@ -6,6 +6,9 @@ import CronometroRegresivo from '../components/flash/CronometroRegresivo'
 import { useResponsive } from '../hooks/useMediaQuery'
 import BotonCerrarSesion from '../components/layout/BotonCerrarSesion'
 import TarjetaRutina from '../components/rutina/TarjetaRutina'
+import RachaStrip from '../components/gamificacion/RachaStrip'
+import GaleriaLogros from '../components/gamificacion/GaleriaLogros'
+import { useGamification } from '../hooks/useGamification'
 
 export default function Panel() {
   const { usuario } = useAuth()
@@ -80,6 +83,8 @@ export default function Panel() {
     ).size
   }, [sesionesRecientes])
 
+  const { datos: gamificacion } = useGamification()
+
   const [busqueda, setBusqueda] = useState('')
   const rutinasFiltradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
@@ -99,6 +104,7 @@ export default function Panel() {
               <button style={s.navLinkActive} onClick={() => navigate('/panel')}>Mis rutinas</button>
               <button style={s.navLink} onClick={() => navigate('/ejercicios')}>Ejercicios</button>
               <button style={s.navLink} onClick={() => navigate('/historial')}>Historial</button>
+              <button style={s.navLink} onClick={() => navigate('/progreso')}>Progreso</button>
             </div>
           )}
         </div>
@@ -169,6 +175,15 @@ export default function Panel() {
               <span style={s.metaOk}>✓</span>
             )}
           </div>
+        )}
+
+        {/* Racha de entrenamientos */}
+        {gamificacion && (
+          <RachaStrip
+            rachaActual={gamificacion.rachaActual}
+            rachaMasLarga={gamificacion.rachaMasLarga}
+            ultimoEntreno={gamificacion.ultimoEntreno}
+          />
         )}
 
         <div style={{
@@ -314,6 +329,11 @@ export default function Panel() {
               </p>
             )}
           </>
+        )}
+
+        {/* Galería de logros */}
+        {gamificacion && (
+          <GaleriaLogros logros={gamificacion.logros} />
         )}
 
       </main>

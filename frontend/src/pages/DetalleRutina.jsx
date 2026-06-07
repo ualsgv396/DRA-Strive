@@ -6,6 +6,7 @@ import ItemEjercicioRutina from '../components/rutina/ItemEjercicioRutina'
 import EditarEjercicioRutina from '../components/rutina/EditarEjercicioRutina'
 import IniciarEntreno from '../components/entreno/IniciarEntreno'
 import ModalBuscarEjercicio from '../components/rutina/ModalBuscarEjercicio'
+import ModalCompartirRutina from '../components/chat/ModalCompartirRutina'
 
 export default function DetalleRutina() {
   const { id } = useParams()
@@ -22,6 +23,7 @@ export default function DetalleRutina() {
   const [ejercicioEditando, setEjercicioEditando] = useState(null)
   const [mostrarIniciar, setMostrarIniciar] = useState(false)
   const [mostrarAnadirEjercicio, setMostrarAnadirEjercicio] = useState(false)
+  const [mostrarCompartir, setMostrarCompartir] = useState(false)
   const [editando, setEditando] = useState(false)
   const [nombreEdit, setNombreEdit] = useState('')
   const [objetivoEdit, setObjetivoEdit] = useState('')
@@ -368,6 +370,12 @@ export default function DetalleRutina() {
             </button>
             <ExportRoutinePDF rutina={rutina} />
             <button
+              onClick={() => setMostrarCompartir(true)}
+              className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors"
+            >
+              ↗ Compartir
+            </button>
+            <button
               onClick={() => navigate('/ejercicios')}
               className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors"
             >
@@ -430,6 +438,14 @@ export default function DetalleRutina() {
           rutinaId={id}
           onAnadido={handleEjercicioAnadido}
           onCerrar={() => setMostrarAnadirEjercicio(false)}
+        />
+      )}
+
+      {/* MODAL COMPARTIR RUTINA */}
+      {mostrarCompartir && rutina && (
+        <ModalCompartirRutina
+          rutina={rutina}
+          onCerrar={() => setMostrarCompartir(false)}
         />
       )}
     </div>

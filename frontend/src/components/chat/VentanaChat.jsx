@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/ContextoAuth'
+import api from '../../api/axios'
 
 // ── Helpers visuales ──────────────────────────────────────────────────────────
 
@@ -42,10 +43,78 @@ function Avatar({ nombre = '?', size = 40, online, ring = true }) {
   )
 }
 
+// ── Tarjeta de rutina compartida ──────────────────────────────────────────────
+
+function TarjetaRutina({ mensaje, esMio }) {
+  const navigate = useNavigate()
+  const [estadoAnadir, setEstadoAnadir] = useState('idle') // idle | loading | done | error
+  const hora = new Date(mensaje.sentAt).toLocaleTimeString('es-ES', {
+    hour: '2-digit', minute: '2-digit',
+  })
+
+  const handleAnadir = async () => {
+    if (estadoAnadir !== 'idle') return
+    setEstadoAnadir('loading')
+    try {
+      await api.post(`/routines/${mensaje.routineId}/duplicate`)
+      setEstadoAnadir('done')
+    } catch {
+      setEstadoAnadir('error')
+      setTimeout(() => setEstadoAnadir('idle'), 2500)
+    }
+  }
+
+  return (
+    <div style={{ ...s.rutina, ...(esMio ? s.rutinaMia : s.rutinaSuya) }}>
+      <div style={s.rutinaHead}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={RED}
+          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m6.5 6.5 11 11M21 21l-1-1M3 3l1 1M18 22l4-4M2 6l4-4M3 10l7-7M14 21l7-7"/>
+        </svg>
+        <span style={s.rutinaLabel}>Rutina compartida</span>
+      </div>
+      <p style={s.rutinaName}>{mensaje.routineNameSnapshot ?? 'Rutina eliminada'}</p>
+      {mensaje.content && <p style={s.rutinaNota}>{mensaje.content}</p>}
+      {mensaje.routineId && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+          <button onClick={() => navigate(`/rutina/${mensaje.routineId}`)} style={s.rutinaBtn}>
+            Ver rutina
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M13 6l6 6-6 6"/>
+            </svg>
+          </button>
+          {!esMio && (
+            <button
+              onClick={handleAnadir}
+              disabled={estadoAnadir !== 'idle'}
+              style={{
+                ...s.rutinaBtn,
+                background: estadoAnadir === 'done'
+                  ? 'rgba(34,197,94,0.16)' : 'rgba(255,255,255,0.07)',
+                borderColor: estadoAnadir === 'done'
+                  ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.18)',
+                color: estadoAnadir === 'done' ? '#22C55E' : '#fff',
+                opacity: estadoAnadir === 'loading' ? 0.6 : 1,
+                cursor: estadoAnadir !== 'idle' ? 'default' : 'pointer',
+              }}
+            >
+              {estadoAnadir === 'loading' && '…'}
+              {estadoAnadir === 'done'    && '✓ Añadida'}
+              {estadoAnadir === 'error'   && 'Error — intenta de nuevo'}
+              {estadoAnadir === 'idle'    && '+ Añadir a mis rutinas'}
+            </button>
+          )}
+        </div>
+      )}
+      <span style={{ ...s.hora, color: esMio ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.45)' }}>{hora}</span>
+    </div>
+  )
+}
+
 // ── Burbuja de mensaje ────────────────────────────────────────────────────────
 
 function BurbujaMensaje({ mensaje, esMio, conCola, mostrarAvatar, nombre }) {
-  const navigate = useNavigate()
   const hora = new Date(mensaje.sentAt).toLocaleTimeString('es-ES', {
     hour: '2-digit', minute: '2-digit',
   })
@@ -64,27 +133,7 @@ function BurbujaMensaje({ mensaje, esMio, conCola, mostrarAvatar, nombre }) {
   if (mensaje.type === 'ROUTINE') {
     return (
       <Wrap ancho="82%">
-        <div style={{ ...s.rutina, ...(esMio ? s.rutinaMia : s.rutinaSuya) }}>
-          <div style={s.rutinaHead}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={RED}
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m6.5 6.5 11 11M21 21l-1-1M3 3l1 1M18 22l4-4M2 6l4-4M3 10l7-7M14 21l7-7"/>
-            </svg>
-            <span style={s.rutinaLabel}>Rutina compartida</span>
-          </div>
-          <p style={s.rutinaName}>{mensaje.routineNameSnapshot ?? 'Rutina eliminada'}</p>
-          {mensaje.content && <p style={s.rutinaNota}>{mensaje.content}</p>}
-          {mensaje.routineId && (
-            <button onClick={() => navigate(`/rutina/${mensaje.routineId}`)} style={s.rutinaBtn}>
-              Ver rutina
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14M13 6l6 6-6 6"/>
-              </svg>
-            </button>
-          )}
-          <span style={{ ...s.hora, color: esMio ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.45)' }}>{hora}</span>
-        </div>
+        <TarjetaRutina mensaje={mensaje} esMio={esMio} />
       </Wrap>
     )
   }

@@ -208,7 +208,7 @@ function PdfTemplate({ innerRef, rutina, ejercicios, totalSeries, totalReps, img
 }
 
 // ── Main exported component ───────────────────────────────────────
-export default function ExportRoutinePDF({ rutina }) {
+export default function ExportRoutinePDF({ rutina, className }) {
   const pdfRef   = useRef(null)
   const [generando, setGenerando] = useState(false)
   const [imgCache, setImgCache]   = useState({})
@@ -292,7 +292,7 @@ export default function ExportRoutinePDF({ rutina }) {
       <button
         onClick={exportar}
         disabled={generando}
-        className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+        className={className ?? "flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"}
       >
         {generando ? (
           <>

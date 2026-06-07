@@ -6,6 +6,7 @@ import com.strive.backend.domain.TrainingExerciseRecord;
 import com.strive.backend.domain.TrainingSession;
 import com.strive.backend.domain.TrainingSessionStatus;
 import com.strive.backend.domain.User;
+import com.strive.backend.dto.BadgeDto;
 import com.strive.backend.dto.CompleteTrainingSessionRequest;
 import com.strive.backend.dto.ExerciseRecordRequest;
 import com.strive.backend.dto.TrainingSessionResponseDto;
@@ -25,19 +26,22 @@ import org.springframework.web.server.ResponseStatusException;
 public class TrainingSessionService {
 
     private final TrainingSessionRepository sessionRepository;
-    private final UserRepository userRepository;
-    private final RoutineRepository routineRepository;
+    private final UserRepository            userRepository;
+    private final RoutineRepository         routineRepository;
     private final RoutineExerciseRepository routineExerciseRepository;
+    private final GamificationService       gamificationService;
 
     public TrainingSessionService(
             TrainingSessionRepository sessionRepository,
             UserRepository userRepository,
             RoutineRepository routineRepository,
-            RoutineExerciseRepository routineExerciseRepository) {
-        this.sessionRepository = sessionRepository;
-        this.userRepository = userRepository;
-        this.routineRepository = routineRepository;
+            RoutineExerciseRepository routineExerciseRepository,
+            GamificationService gamificationService) {
+        this.sessionRepository        = sessionRepository;
+        this.userRepository           = userRepository;
+        this.routineRepository        = routineRepository;
         this.routineExerciseRepository = routineExerciseRepository;
+        this.gamificationService      = gamificationService;
     }
 
     @Transactional
@@ -57,7 +61,7 @@ public class TrainingSessionService {
         session.setStatus(TrainingSessionStatus.STARTED);
         session.setNotes(notes);
 
-        return toDto(sessionRepository.save(session));
+        return toDto(sessionRepository.save(session), null);
     }
 
     @Transactional
@@ -92,7 +96,12 @@ public class TrainingSessionService {
             }
         }
 
-        return toDto(sessionRepository.save(session));
+        TrainingSession saved = sessionRepository.save(session);
+
+        // Actualizar racha y evaluar logros; se devuelven los NUEVOS
+        List<BadgeDto> newBadges = gamificationService.procesarLogrosDeEntreno(saved.getUser());
+
+        return toDto(saved, newBadges);
     }
 
     @Transactional
@@ -108,7 +117,7 @@ public class TrainingSessionService {
         return sessionRepository.findTop30ByUserIdOrderByStartedAtDesc(userId)
                 .stream()
                 .limit(Math.min(limit, 30))
-                .map(this::toDto)
+                .map(s -> toDto(s, null))
                 .toList();
     }
 
@@ -116,14 +125,14 @@ public class TrainingSessionService {
     public List<TrainingSessionResponseDto> getByRoutine(Long userId, Long routineId) {
         return sessionRepository.findByRoutineIdAndUserIdOrderByStartedAtDesc(routineId, userId)
                 .stream()
-                .map(this::toDto)
+                .map(s -> toDto(s, null))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public TrainingSessionResponseDto getById(Long id) {
         return sessionRepository.findById(id)
-                .map(this::toDto)
+                .map(s -> toDto(s, null))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
     }
 
@@ -132,7 +141,7 @@ public class TrainingSessionService {
         return sessionRepository.findById(id);
     }
 
-    private TrainingSessionResponseDto toDto(TrainingSession session) {
+    private TrainingSessionResponseDto toDto(TrainingSession session, List<BadgeDto> newBadges) {
         return new TrainingSessionResponseDto(
                 session.getId(),
                 session.getRoutineId(),
@@ -142,7 +151,8 @@ public class TrainingSessionService {
                 session.getDurationMinutes(),
                 session.getStatus().name(),
                 session.getNotes(),
-                session.getRecords()
+                session.getRecords(),
+                newBadges
         );
     }
 }

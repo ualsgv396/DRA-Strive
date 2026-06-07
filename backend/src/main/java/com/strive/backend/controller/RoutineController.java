@@ -58,7 +58,8 @@ public class RoutineController {
 
     @GetMapping("/{id}")
     public Routine getById(@PathVariable Long id) {
-        return requireOwnership(id);
+        return routineService.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Routine not found: " + id));
     }
 
     @PostMapping
@@ -98,7 +99,10 @@ public class RoutineController {
     @PostMapping("/{id}/duplicate")
     @ResponseStatus(HttpStatus.CREATED)
     public Routine duplicate(@PathVariable Long id) {
-        requireOwnership(id);
+        // Cualquier usuario autenticado puede duplicar una rutina a su propio panel.
+        // Necesario para la funcionalidad de "Añadir a mis rutinas" desde el chat.
+        routineService.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Routine not found: " + id));
         User currentUser = currentUserService.getCurrentUser();
         return routineService.duplicateRoutine(id, currentUser.getId());
     }

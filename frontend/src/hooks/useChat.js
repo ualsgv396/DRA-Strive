@@ -198,6 +198,34 @@ export function useChat() {
     })
   }, [clientRef])
 
+  /**
+   * Comparte una rutina con un amigo: obtiene/crea la conversación y publica
+   * un mensaje de tipo ROUTINE vía STOMP.
+   * Diseñado para ser llamado desde ModalCompartirRutina sin necesitar
+   * una conversación activa previa.
+   */
+  const compartirRutinaConAmigo = useCallback(async (
+    amigoId,
+    routineId,
+    routineName,
+    nota = ''
+  ) => {
+    if (!clientRef.current?.active) {
+      throw new Error('Sin conexión al chat. Recarga la página e inténtalo de nuevo.')
+    }
+    const { data: conv } = await api.post(`/chat/conversations/${amigoId}`)
+    clientRef.current.publish({
+      destination: '/app/chat.send',
+      body: JSON.stringify({
+        conversationId:      conv.id,
+        content:             nota || '',
+        type:                'ROUTINE',
+        routineId,
+        routineNameSnapshot: routineName,
+      }),
+    })
+  }, [clientRef])
+
   return {
     conectado,
     conversaciones,
@@ -209,6 +237,7 @@ export function useChat() {
     abrirConversacion,
     cerrarConversacion,
     enviarMensaje,
+    compartirRutinaConAmigo,
     cargarConversaciones,
   }
 }

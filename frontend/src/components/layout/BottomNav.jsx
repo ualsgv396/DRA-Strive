@@ -1,16 +1,18 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import HomeFillIcon    from 'remixicon-react/HomeFillIcon'
-import HeartAddLineIcon from 'remixicon-react/HeartAddLineIcon'
-import UserLineIcon    from 'remixicon-react/UserLineIcon'
-import TeamLineIcon    from 'remixicon-react/TeamLineIcon'
-import BookletLineIcon  from 'remixicon-react/BookletLineIcon'
+import HomeFillIcon      from 'remixicon-react/HomeFillIcon'
+import HeartAddLineIcon  from 'remixicon-react/HeartAddLineIcon'
+import UserLineIcon      from 'remixicon-react/UserLineIcon'
+import TeamLineIcon      from 'remixicon-react/TeamLineIcon'
+import BookletLineIcon   from 'remixicon-react/BookletLineIcon'
+import LineChartLineIcon from 'remixicon-react/LineChartLineIcon'
 
 const NAV_ITEMS = [
-  { label: 'INICIO',     Icon: HomeFillIcon,    ruta: '/panel'        },
-  { label: 'CREAR',      Icon: HeartAddLineIcon, ruta: '/rutina/nueva' },
-  { label: 'PERFIL',     Icon: UserLineIcon,     ruta: '/perfil'       },
-  { label: 'AMIGOS',     Icon: TeamLineIcon,     ruta: '/amigos'       },
-  { label: 'EJERCICIOS', Icon: BookletLineIcon,  ruta: '/ejercicios'   },
+  { label: 'INICIO',     Icon: HomeFillIcon,      ruta: '/panel'        },
+  { label: 'CREAR',      Icon: HeartAddLineIcon,  ruta: '/rutina/nueva' },
+  { label: 'PERFIL',     Icon: UserLineIcon,      ruta: '/perfil'       },
+  { label: 'AMIGOS',     Icon: TeamLineIcon,      ruta: '/amigos'       },
+  { label: 'EJERCICIOS', Icon: BookletLineIcon,   ruta: '/ejercicios'   },
+  { label: 'PROGRESO',   Icon: LineChartLineIcon, ruta: '/progreso'     },
 ]
 
 const GRAY_INACTIVE = 'rgba(255,255,255,0.55)'
@@ -52,7 +54,7 @@ export default function BottomNav() {
             aria-label={label}
             className={[
               'flex flex-col items-center justify-center gap-1',
-              'min-h-[54px] min-w-[48px] flex-1 max-w-[88px]',
+              'min-h-[54px] min-w-[40px] flex-1 max-w-[80px]',
               'rounded-xl px-1 py-2',
               'cursor-pointer select-none',
               'transition-all duration-150',

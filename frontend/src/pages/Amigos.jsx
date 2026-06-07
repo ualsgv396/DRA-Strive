@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import api from '../api/axios'
 import { useChat } from '../hooks/useChat'
 import VentanaChat from '../components/chat/VentanaChat'
+import FeedItem from '../components/feed/FeedItem'
 
 // ── Helpers visuales ──────────────────────────────────────────────────────────
 
@@ -74,6 +75,8 @@ export default function Amigos() {
   const location = useLocation()
   const chat     = useChat()
 
+  const [tab, setTab] = useState('actividad')  // 'actividad' | 'amigos'
+
   const [busqueda, setBusqueda] = useState('')
   const [amigos, setAmigos] = useState([])
   const [solicitudes, setSolicitudes] = useState([])
@@ -84,8 +87,26 @@ export default function Amigos() {
   const [enlaceCopiado, setEnlaceCopiado] = useState(false)
   const [mensaje, setMensaje] = useState('')
 
+  const [feedItems, setFeedItems]         = useState([])
+  const [cargandoFeed, setCargandoFeed]   = useState(true)
+  const [errorFeed, setErrorFeed]         = useState('')
+
+  const cargarFeed = useCallback(async () => {
+    setCargandoFeed(true)
+    setErrorFeed('')
+    try {
+      const { data } = await api.get('/feed')
+      setFeedItems(data ?? [])
+    } catch {
+      setErrorFeed('No se pudo cargar el feed de actividad')
+    } finally {
+      setCargandoFeed(false)
+    }
+  }, [])
+
   useEffect(() => {
     cargarDatos()
+    cargarFeed()
   }, [])
 
   useEffect(() => {
@@ -168,6 +189,16 @@ export default function Amigos() {
     }
   }
 
+  const handleReaccion = useCallback((sessionId, _emoji, updatedReacciones) => {
+    setFeedItems(prev =>
+      prev.map(item =>
+        item.sessionId === sessionId
+          ? { ...item, reacciones: updatedReacciones }
+          : item
+      )
+    )
+  }, [])
+
   const copiarEnlace = async () => {
     if (!invitacion?.inviteUrl) return
     try {
@@ -181,6 +212,7 @@ export default function Amigos() {
 
   return (
     <div style={estilos.contenedor}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       <main style={estilos.main}>
 
         {/* ── Hero ── */}
@@ -210,6 +242,53 @@ export default function Amigos() {
             <span style={estilos.statLabel}>En línea</span>
           </div>
         </div>
+
+        {/* ── Tabs: Actividad / Red Social ── */}
+        <div style={estilos.tabs}>
+          <button
+            onClick={() => setTab('actividad')}
+            style={{ ...estilos.tabBtn, ...(tab === 'actividad' ? estilos.tabActivo : {}) }}
+          >
+             Actividad
+          </button>
+          <button
+            onClick={() => setTab('amigos')}
+            style={{ ...estilos.tabBtn, ...(tab === 'amigos' ? estilos.tabActivo : {}) }}
+          >
+             Red social
+          </button>
+        </div>
+
+        {/* ── Tab: Feed de actividad ── */}
+        {tab === 'actividad' && (
+          <section style={{ marginBottom: 24 }}>
+            {cargandoFeed && (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+                <div style={estilos.spinner} />
+              </div>
+            )}
+            {!cargandoFeed && errorFeed && (
+              <p style={{ ...estilos.textoSuave, color: RED, textAlign: 'center' }}>{errorFeed}</p>
+            )}
+            {!cargandoFeed && !errorFeed && feedItems.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                <span style={{ fontSize: 44, opacity: 0.5 }}>🏋️</span>
+                <p style={{ ...estilos.textoSuave, marginTop: 12 }}>
+                  Cuando tus amigos completen un entreno aparecerá aquí.
+                </p>
+              </div>
+            )}
+            {!cargandoFeed && feedItems.map(item => (
+              <div key={item.sessionId} style={{ marginBottom: 12 }}>
+                <FeedItem item={item} onReaccion={handleReaccion} />
+              </div>
+            ))}
+          </section>
+        )}
+
+        {/* ── Tab: Red social (contenido original) ── */}
+        {tab === 'amigos' && (
+          <>
 
         {/* ── Conversaciones recientes ── */}
         {chat.conversaciones.length > 0 && (
@@ -396,6 +475,10 @@ export default function Amigos() {
 
         {procesandoInvitacion && <p style={estilos.textoSuave}>Procesando invitacion...</p>}
         {mensaje && <p style={estilos.mensaje}>{mensaje}</p>}
+
+          </>
+        )}
+
       </main>
 
       {/* Overlay de chat: se renderiza encima cuando hay conversación activa */}
@@ -504,4 +587,32 @@ const estilos = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 28px rgba(230,57,70,0.32)',
   },
   mensaje: { marginTop: 12, color: RED, fontSize: 13, fontFamily: "'Inter', sans-serif" },
+
+  // ── Tabs ──
+  tabs: {
+    display: 'flex', gap: 6, marginBottom: 20,
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: 14, padding: 5,
+  },
+  tabBtn: {
+    flex: 1, padding: '10px 0',
+    fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 14,
+    borderRadius: 10, border: 'none', cursor: 'pointer',
+    color: 'rgba(255,255,255,0.45)', background: 'transparent',
+    transition: 'background .15s, color .15s',
+  },
+  tabActivo: {
+    background: `linear-gradient(160deg, ${RED}, ${RED_DARK})`,
+    color: '#fff',
+    boxShadow: '0 4px 16px rgba(230,57,70,0.28)',
+  },
+
+  spinner: {
+    width: 28, height: 28,
+    border: '3px solid rgba(230,57,70,0.2)',
+    borderTop: `3px solid ${RED}`,
+    borderRadius: '50%',
+    animation: 'spin 0.7s linear infinite',
+  },
 }

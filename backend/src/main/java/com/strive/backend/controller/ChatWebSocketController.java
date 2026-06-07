@@ -55,12 +55,15 @@ public class ChatWebSocketController {
         if (request.conversationId() == null) {
             throw new IllegalArgumentException("conversationId es obligatorio");
         }
-        if (request.content() == null || request.content().isBlank()) {
-            throw new IllegalArgumentException("El mensaje no puede estar vacío");
-        }
 
         String senderEmail = principal.getName();
         MessageType tipo   = request.type() != null ? request.type() : MessageType.TEXT;
+
+        // El content solo es obligatorio para mensajes de texto; las rutinas
+        // llevan el payload en routineId/routineNameSnapshot y la nota es opcional.
+        if (tipo == MessageType.TEXT && (request.content() == null || request.content().isBlank())) {
+            throw new IllegalArgumentException("El mensaje no puede estar vacío");
+        }
 
         // Persistir + obtener email destinatario en una sola transacción
         EnviarMensajeResultado resultado = chatService.procesarMensajeWs(

@@ -13,6 +13,8 @@ public record TrainingSessionResponseDto(
         Integer durationMinutes,
         String status,
         String notes,
-        List<TrainingExerciseRecord> exercises
-) {
-}
+        List<TrainingExerciseRecord> exercises,
+        // Solo se rellena al completar una sesión; null en el resto de endpoints.
+        // El frontend lo usa para mostrar toasts de nuevos logros desbloqueados.
+        List<BadgeDto> newBadges
+) {}

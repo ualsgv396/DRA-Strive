@@ -6,7 +6,7 @@ services:
     restart: always
     env_file: .env
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - strive_mysql_data:/var/lib/mysql
     healthcheck:
@@ -32,8 +32,6 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # Docker Compose busca automáticamente en el archivo .env de la raíz
-        # para inyectar este valor durante el "npm run build" de Vite
         - VITE_API_URL=${VITE_API_URL}
     container_name: strive-frontend
     restart: always

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../api/axios'
+import ToastLogro from '../components/gamificacion/ToastLogro'
 
 function formatElapsed(seconds) {
   const m = Math.floor(seconds / 60)
@@ -21,6 +22,7 @@ export default function RegistroEntreno() {
   const [completando, setCompletando] = useState(false)
   const [abandonando, setAbandonando] = useState(false)
   const [mostrarExito, setMostrarExito] = useState(false)
+  const [nuevosLogros, setNuevosLogros] = useState([])
   const [resumen, setResumen] = useState(null)
   const [mostrarModalAbandonar, setMostrarModalAbandonar] = useState(false)
   const [ejerciciosCompletados, setEjerciciosCompletados] = useState(new Set())
@@ -151,11 +153,14 @@ export default function RegistroEntreno() {
         loadUnit: r.loadUnit || 'KG',
         notes: r.notes || null,
       }))
-      await api.put(`/training-sessions/${sessionId}/complete`, {
+      const { data: sesionCompletada } = await api.put(`/training-sessions/${sessionId}/complete`, {
         durationMinutes,
         exercises,
         notes: notaSesion.trim() || null,
       })
+      if (sesionCompletada?.newBadges?.length > 0) {
+        setNuevosLogros(sesionCompletada.newBadges)
+      }
       clearInterval(intervalRef.current)
       const totalSeries = exercises.reduce((acc, r) => acc + (r.setsCompleted || 0), 0)
       const totalReps   = exercises.reduce((acc, r) => acc + (r.setsCompleted || 0) * (r.repsCompleted || 0), 0)
@@ -220,6 +225,8 @@ export default function RegistroEntreno() {
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white pb-32">
+
+      <ToastLogro badges={nuevosLogros} onDone={() => setNuevosLogros([])} />
 
       {/* NAVBAR — timer dominante */}
       <nav

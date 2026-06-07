@@ -333,7 +333,27 @@ export default function Panel() {
 
         {/* Galería de logros */}
         {gamificacion && (
-          <GaleriaLogros logros={gamificacion.logros} />
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: -8 }}>
+              <button
+                onClick={() => navigate('/logros')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'rgba(255,255,255,0.38)',
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: '4px 0',
+                  letterSpacing: '0.3px',
+                }}
+              >
+                Ver todos →
+              </button>
+            </div>
+            <GaleriaLogros logros={gamificacion.logros} />
+          </div>
         )}
 
       </main>

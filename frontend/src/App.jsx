@@ -18,6 +18,7 @@ import GestionUsuarios from './pages/admin/GestionUsuarios'
 import RegistroEntreno from './pages/RegistroEntreno'
 import HistorialEntrenos from './pages/HistorialEntrenos'
 import Progreso from './pages/Progreso'
+import Logros from './pages/Logros'
 
 const RUTAS_SIN_NAV = new Set(['/', '/login', '/registro'])
 
@@ -61,6 +62,7 @@ function RutasApp() {
         <Route path="/perfil"  element={<RutaProtegida><Perfil /></RutaProtegida>} />
         <Route path="/historial" element={<RutaProtegida><HistorialEntrenos /></RutaProtegida>} />
         <Route path="/progreso"  element={<RutaProtegida><Progreso /></RutaProtegida>} />
+        <Route path="/logros"    element={<RutaProtegida><Logros /></RutaProtegida>} />
         <Route path="/entrenamiento/:sessionId" element={<RutaProtegida><RegistroEntreno /></RutaProtegida>} />
         <Route path="/admin"           element={<RutaProtegida soloAdmin><PanelAdmin /></RutaProtegida>} />
         <Route path="/admin/ejercicios" element={<RutaProtegida soloAdmin><GestorEjercicios /></RutaProtegida>} />

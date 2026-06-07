@@ -347,40 +347,70 @@ export default function DetalleRutina() {
         </div>
 
         {/* Acciones */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-8">
           <button
             onClick={() => setMostrarIniciar(true)}
-            className="w-full bg-[#E63946] text-white py-5 rounded-xl font-['Oswald'] font-bold text-xl uppercase tracking-wider hover:bg-[#C1121F] transition-colors"
+            className="w-full bg-[#E63946] text-white py-5 rounded-xl font-['Oswald'] font-bold text-xl uppercase tracking-wider hover:bg-[#C1121F] transition-colors shadow-[0_10px_30px_rgba(230,57,70,0.30)]"
           >
             ▶ Iniciar entrenamiento
           </button>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <button
-              onClick={() => navigate('/rutina/nueva')}
-              className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors"
-            >
-              + Nueva rutina
-            </button>
-            <button
-              onClick={handleDuplicar}
-              disabled={duplicando}
-              className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors disabled:opacity-50"
-            >
-              {duplicando ? 'Duplicando...' : '⎘ Duplicar rutina'}
-            </button>
-            <ExportRoutinePDF rutina={rutina} />
-            <button
-              onClick={() => setMostrarCompartir(true)}
-              className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors"
-            >
-              ↗ Compartir
-            </button>
-            <button
-              onClick={() => navigate('/ejercicios')}
-              className="flex-1 border border-white/20 text-white/60 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:text-white hover:border-white/40 transition-colors"
-            >
-              Ver ejercicios
-            </button>
+
+          {/* Panel de acciones secundarias */}
+          <div className="bg-[#141414] border border-white/[0.06] rounded-2xl p-6 md:p-7">
+            <div className="flex items-center gap-3 mb-5">
+              <span className="text-[10px] font-['JetBrains_Mono',monospace] uppercase tracking-[2px] text-white/30">
+                Acciones rápidas
+              </span>
+              <div className="flex-1 h-px bg-white/5" />
+            </div>
+
+            {/* Fila primaria: 2 botones destacados */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+              <button
+                onClick={() => navigate('/rutina/nueva')}
+                className="group flex items-center gap-4 bg-gradient-to-br from-[#E63946] to-[#C1121F] text-white px-5 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:brightness-110 transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_22px_rgba(230,57,70,0.28)]"
+              >
+                <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-white/15 text-xl leading-none">＋</span>
+                <div className="text-left flex-1">
+                  <span className="block leading-tight">Nueva rutina</span>
+                  <span className="block text-[10px] font-normal tracking-wider opacity-80 normal-case">Empezar desde cero</span>
+                </div>
+              </button>
+
+              <button
+                onClick={handleDuplicar}
+                disabled={duplicando}
+                className="group flex items-center gap-4 bg-[#1F1F1F] border border-white/10 text-white px-5 py-4 rounded-xl font-['Oswald'] font-bold text-base uppercase tracking-wider hover:bg-[#262626] hover:border-white/20 transition-colors disabled:opacity-50"
+              >
+                <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-[#E63946]/15 text-[#FF6B7A] text-lg leading-none">⎘</span>
+                <div className="text-left flex-1">
+                  <span className="block leading-tight">{duplicando ? 'Duplicando…' : 'Duplicar rutina'}</span>
+                  <span className="block text-[10px] font-normal tracking-wider text-white/40 normal-case">Crear una copia editable</span>
+                </div>
+              </button>
+            </div>
+
+            {/* Fila secundaria: 3 acciones terciarias */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <ExportRoutinePDF
+                rutina={rutina}
+                className="w-full flex items-center justify-center gap-2 bg-[#1A1A1A] text-white/65 px-4 py-3.5 rounded-xl font-['Oswald'] font-semibold text-[13px] uppercase tracking-wider hover:bg-[#222] hover:text-white transition-colors disabled:opacity-50"
+              />
+
+              <button
+                onClick={() => setMostrarCompartir(true)}
+                className="w-full flex items-center justify-center gap-2 bg-[#1A1A1A] text-white/65 px-4 py-3.5 rounded-xl font-['Oswald'] font-semibold text-[13px] uppercase tracking-wider hover:bg-[#222] hover:text-white transition-colors"
+              >
+                ↗ Compartir
+              </button>
+
+              <button
+                onClick={() => navigate('/ejercicios')}
+                className="w-full flex items-center justify-center gap-2 bg-[#1A1A1A] text-white/65 px-4 py-3.5 rounded-xl font-['Oswald'] font-semibold text-[13px] uppercase tracking-wider hover:bg-[#222] hover:text-white transition-colors"
+              >
+                Ver ejercicios
+              </button>
+            </div>
           </div>
         </div>
       </div>
